@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +9,8 @@ import '../services/aggregation_service.dart';
 import '../services/exchange_rate_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
+import '../utils/item_image_ref.dart';
+import '../widgets/item_cover_image.dart';
 import 'add_item_screen.dart';
 import 'completed_items_screen.dart';
 import 'item_detail_screen.dart';
@@ -872,10 +872,9 @@ class _ItemCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (item.imagePath != null &&
-                          File(item.imagePath!).existsSync())
-                        Image.file(
-                          File(item.imagePath!),
+                      if (itemImageRefIsDisplayable(item.imagePath))
+                        ItemCoverImage(
+                          imageRef: item.imagePath!,
                           fit: BoxFit.cover,
                           color: Color.fromRGBO(
                             255,

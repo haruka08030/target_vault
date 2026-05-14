@@ -9,12 +9,15 @@ import '../services/aggregation_service.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/notification_service.dart';
 
-List<SingleChildWidget> appProviders() {
+/// [database] を渡すとそのインスタンスを使う（Widget テスト用）。
+List<SingleChildWidget> appProviders({AppDatabase? database}) {
   return [
-    Provider<AppDatabase>(
-      create: (_) => AppDatabase(),
-      dispose: (_, db) => db.close(),
-    ),
+    database != null
+        ? Provider<AppDatabase>.value(value: database)
+        : Provider<AppDatabase>(
+            create: (_) => AppDatabase(),
+            dispose: (_, db) => db.close(),
+          ),
     ProxyProvider<AppDatabase, SettingsStore>(
       update: (_, db, previous) => SettingsStore(db),
     ),

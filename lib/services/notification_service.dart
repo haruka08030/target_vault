@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -13,6 +14,10 @@ class NotificationService {
   bool _initialized = false;
 
   Future<void> _init() async {
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
     if (_initialized) return;
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings(
@@ -27,6 +32,7 @@ class NotificationService {
   }
 
   Future<void> cancelAll() async {
+    if (kIsWeb) return;
     await _plugin.cancelAll();
   }
 
@@ -36,6 +42,7 @@ class NotificationService {
     required String body,
     required DateTime date,
   }) async {
+    if (kIsWeb) return;
     try {
       tz_data.initializeTimeZones();
       final local = tz.local;
@@ -68,6 +75,7 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
+    if (kIsWeb) return;
     try {
       tz_data.initializeTimeZones();
       final local = tz.local;
@@ -113,6 +121,7 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
+    if (kIsWeb) return;
     try {
       tz_data.initializeTimeZones();
       final local = tz.local;

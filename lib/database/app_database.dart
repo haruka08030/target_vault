@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart';
+
+import 'database_connection.dart';
+import 'memory_test_executor.dart';
 
 part 'app_database.g.dart';
 
@@ -35,6 +34,7 @@ class Items extends Table {
   DateTimeColumn get targetDate => dateTime().nullable()();
   TextColumn get category => text().nullable()();
   TextColumn get status => text().map(ItemStatusConverter())();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
@@ -66,16 +66,21 @@ class SettingsTable extends Table {
 
 @DriftDatabase(tables: [Items, Transactions, SettingsTable])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase() : super(connectAppDatabaseExecutor());
+
+  /// メモリ SQLite。Widget テスト用（ストリームを同期的に閉じる）。
+  @visibleForTesting
+  AppDatabase.memoryForTests() : super(memoryTestExecutor());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
-  static QueryExecutor _openConnection() {
-    return LazyDatabase(() async {
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dbFolder.path, 'target_vault.db'));
-      return NativeDatabase.createInBackground(file);
-    });
-  }
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.addColumn(items, items.sortOrder);
+      }
+    },
+  );
 }

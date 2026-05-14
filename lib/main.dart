@@ -2,41 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'database/app_database.dart';
 import 'providers/app_providers.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0D0D0D),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
+  SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
   runApp(const TargetVaultApp());
 }
 
 class TargetVaultApp extends StatelessWidget {
-  const TargetVaultApp({super.key});
+  const TargetVaultApp({super.key, this.database});
+
+  /// 指定時はこの DB で Provider を構成する（Widget テスト用）。
+  final AppDatabase? database;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: appProviders(),
+      providers: appProviders(database: database),
       child: MaterialApp(
         title: 'Target Vault',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          colorScheme: ColorScheme.dark(
-            primary: const Color(0xFF6366F1),
-            surface: const Color(0xFF0D0D0D),
-            onSurface: Colors.white,
-          ),
-        ),
+        theme: AppTheme.theme,
         home: const HomeScreen(),
       ),
     );
