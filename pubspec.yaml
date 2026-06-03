@@ -29,6 +29,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
   drift: ^2.20.0
   sqlite3_flutter_libs: ^0.5.26
@@ -44,10 +46,10 @@ dependencies:
   timezone: ^0.9.4
 
 dev_dependencies:
-  drift_dev: ^2.20.0
-  build_runner: ^2.4.14
   flutter_test:
     sdk: flutter
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.13
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -61,6 +63,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

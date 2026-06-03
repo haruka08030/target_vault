@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:target_vault/database/app_database.dart';
-import 'package:target_vault/providers/app_providers.dart';
+import 'package:target_vault/models/item_status.dart';
+import 'package:target_vault/models/vault_item.dart';
 import 'package:target_vault/screens/quick_add_sheet.dart';
 
+import 'support/in_memory_backend.dart';
+import 'support/test_widget_providers.dart';
+
 Widget wrapWithProviders(Widget child) {
-  final database = AppDatabase.memoryForTests();
-  addTearDown(() async {
-    await database.close();
-  });
+  final backend = ItemTxTestBackend();
+  addTearDown(backend.dispose);
   return MultiProvider(
-    providers: appProviders(database: database),
+    providers: testWidgetProviders(backend),
     child: MaterialApp(
       theme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
       home: Scaffold(
@@ -21,9 +22,9 @@ Widget wrapWithProviders(Widget child) {
   );
 }
 
-Item createTestItem() {
+VaultItem createTestItem() {
   final now = DateTime.now();
-  return Item(
+  return VaultItem(
     id: 'test-id-quickadd',
     title: 'テストアイテム',
     targetAmount: 5000,

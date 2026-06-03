@@ -1,21 +1,26 @@
-import 'dart:io';
+import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import 'package:drift/drift.dart' show Value;
-
-import '../database/app_database.dart';
+import '../l10n/app_localizations.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
 import '../repositories/item_repository.dart';
+import '../theme/app_colors.dart';
 import '../utils/confirm_dialog.dart';
+import '../utils/item_image_ref.dart';
+import '../utils/thousands_separator_input_formatter.dart';
+import '../widgets/item_cover_image.dart';
+import 'add_item_image.dart';
 
 class AddItemScreen extends StatefulWidget {
   const AddItemScreen({super.key, this.editItem});
 
-  final Item? editItem;
+  final VaultItem? editItem;
 
   @override
   State<AddItemScreen> createState() => _AddItemScreenState();
@@ -29,6 +34,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
   DateTime? _targetDate;
   String _currency = 'JPY';
   bool _isLoading = false;
+  bool _purchasedOnCredit = false;
 
   static const _currencies = ['JPY', 'USD', 'EUR', 'GBP', 'CHF'];
 
@@ -37,9 +43,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
     super.initState();
     if (widget.editItem != null) {
       _titleController.text = widget.editItem!.title;
-      _targetController.text = widget.editItem!.targetAmount.toStringAsFixed(
-        widget.editItem!.currency == 'JPY' ? 0 : 2,
-      );
+      final isJpy = widget.editItem!.currency == 'JPY';
+      _targetController.text = isJpy
+          ? NumberFormat('#,###').format(widget.editItem!.targetAmount.toInt())
+          : NumberFormat('#,##0.00').format(widget.editItem!.targetAmount);
       _categoryController.text = widget.editItem!.category ?? '';
       _imagePath = widget.editItem!.imagePath;
       _targetDate = widget.editItem!.targetDate;
@@ -59,12 +66,38 @@ class _AddItemScreenState extends State<AddItemScreen> {
     final picker = ImagePicker();
     final x = await picker.pickImage(source: ImageSource.gallery);
     if (x == null || !mounted) return;
-    final dir = await getApplicationDocumentsDirectory();
-    final dest = File(
-      '${dir.path}/item_${DateTime.now().millisecondsSinceEpoch}.jpg',
-    );
-    await x.saveTo(dest.path);
-    setState(() => _imagePath = dest.path);
+    try {
+      if (kIsWeb) {
+        final bytes = await x.readAsBytes();
+        if (!mounted) return;
+        setState(
+          () => _imagePath = 'data:image/jpeg;base64,${base64Encode(bytes)}',
+        );
+        return;
+      }
+      final path = await savePickedImageToAppDir(x);
+      if (!mounted) return;
+      if (path == null) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.imageSaveFailed),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        return;
+      }
+      setState(() => _imagePath = path);
+    } catch (_) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.imageSaveFailed),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
   }
 
   void _clearImage() {
@@ -75,9 +108,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
     final title = _titleController.text.trim();
     final target = double.tryParse(_targetController.text.replaceAll(',', ''));
     if (title.isEmpty || target == null || target <= 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('タイトルと目標金額を入力してください')));
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.titleAndTargetRequired)),
+      );
       return;
     }
 
@@ -85,17 +119,38 @@ class _AddItemScreenState extends State<AddItemScreen> {
     final repo = context.read<ItemRepository>();
 
     if (widget.editItem != null) {
+      final id = widget.editItem!.id;
+      final wasSaving = widget.editItem!.status == ItemStatus.saving;
       await repo.updateItem(
-        widget.editItem!.id,
+        id,
         title: title,
         targetAmount: target,
         currency: _currency,
-        imagePath: Value(_imagePath),
         targetDate: _targetDate,
         category: _categoryController.text.trim().isEmpty
             ? null
             : _categoryController.text.trim(),
+        imagePath: _imagePath,
       );
+      if (wasSaving && _purchasedOnCredit) {
+        final ok = await repo.convertSavingItemToRepayingOnCredit(
+          id,
+          targetAmount: target,
+        );
+        if (!ok) {
+          if (mounted) {
+            final l10n = AppLocalizations.of(context)!;
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.convertToRepayingFailed),
+                backgroundColor: AppColors.warning,
+              ),
+            );
+          }
+          return;
+        }
+      }
     } else {
       await repo.createItem(
         title: title,
@@ -106,6 +161,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
         category: _categoryController.text.trim().isEmpty
             ? null
             : _categoryController.text.trim(),
+        purchasedOnCredit: _purchasedOnCredit,
       );
     }
     if (mounted) Navigator.pop(context);
@@ -115,11 +171,12 @@ class _AddItemScreenState extends State<AddItemScreen> {
     final title = _titleController.text.trim().isEmpty
         ? widget.editItem!.title
         : _titleController.text.trim();
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showAppConfirmDialog(
       context,
-      title: 'アイテムを削除',
-      content: Text('「$title」を削除しますか？ 入出金履歴も一緒に削除されます。'),
-      confirmLabel: '削除',
+      title: l10n.deleteItemTitle,
+      content: Text(l10n.deleteItemConfirm(title)),
+      confirmLabel: l10n.delete,
       isDestructive: true,
     );
     if (confirmed != true || !mounted) return;
@@ -127,29 +184,32 @@ class _AddItemScreenState extends State<AddItemScreen> {
     await context.read<ItemRepository>().deleteItem(widget.editItem!.id);
     if (!mounted) return;
     Navigator.pop(context);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('アイテムを削除しました')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.itemDeleted)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.editItem != null;
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).toString();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.9)),
+          icon: Icon(Icons.close, color: AppColors.onSurfaceAlpha(0.9)),
         ),
         title: Text(
-          isEdit ? 'アイテムを編集' : 'アイテムを追加',
+          isEdit ? l10n.editItem : l10n.addItem,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.95),
-            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Manrope',
           ),
         ),
         actions: [
@@ -160,14 +220,14 @@ class _AddItemScreenState extends State<AddItemScreen> {
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
-                      color: Color(0xFF6366F1),
+                      color: AppColors.primary,
                       strokeWidth: 2,
                     ),
                   )
-                : const Text(
-                    '保存',
-                    style: TextStyle(
-                      color: Color(0xFF6366F1),
+                : Text(
+                    l10n.save,
+                    style: const TextStyle(
+                      color: AppColors.secondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -182,21 +242,18 @@ class _AddItemScreenState extends State<AddItemScreen> {
             GestureDetector(
               onTap: _pickImage,
               child: Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: _imagePath != null && File(_imagePath!).existsSync()
+                height: 190,
+                decoration: AppColors.elevatedCard(radius: 24),
+                child: itemImageRefIsDisplayable(_imagePath)
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(24),
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.file(File(_imagePath!), fit: BoxFit.cover),
+                            ItemCoverImage(
+                              imageRef: _imagePath!,
+                              fit: BoxFit.cover,
+                            ),
                             Positioned(
                               top: 8,
                               right: 8,
@@ -209,7 +266,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
                                   padding: const EdgeInsets.all(6),
                                   minimumSize: const Size(36, 36),
                                 ),
-                                tooltip: '写真を削除',
+                                tooltip: l10n.removePhoto,
                               ),
                             ),
                             Positioned(
@@ -223,9 +280,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                                     color: Colors.black54,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.edit,
-                                    color: Colors.white,
+                                    color: AppColors.onSurfaceAlpha(1),
                                     size: 20,
                                   ),
                                 ),
@@ -240,13 +297,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
                           Icon(
                             Icons.add_photo_alternate_outlined,
                             size: 48,
-                            color: Colors.white.withValues(alpha: 0.4),
+                            color: AppColors.onSurfaceAlpha(0.4),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '写真を追加（任意）',
+                            l10n.addPhotoOptional,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: AppColors.onSurfaceAlpha(0.5),
                               fontSize: 14,
                             ),
                           ),
@@ -257,19 +314,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
             const SizedBox(height: 24),
             TextField(
               controller: _titleController,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                labelText: 'タイトル',
-                labelStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+              style: TextStyle(
+                color: AppColors.onSurfaceAlpha(1),
+                fontSize: 16,
               ),
+              decoration: InputDecoration(labelText: l10n.fieldTitle),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -278,45 +327,53 @@ class _AddItemScreenState extends State<AddItemScreen> {
                 decimal: true,
               ),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                  RegExp(_currency == 'JPY' ? r'[\d]' : r'[\d.]'),
+                ThousandsSeparatorInputFormatter(
+                  decimalAllowed: _currency != 'JPY',
                 ),
               ],
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: TextStyle(
+                color: AppColors.onSurfaceAlpha(1),
+                fontSize: 16,
+              ),
               decoration: InputDecoration(
-                labelText: '目標金額',
-                labelStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                labelText: l10n.fieldTargetAmount,
                 suffixText: _currency,
-                suffixStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
+                suffixStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.6)),
               ),
             ),
+            if (widget.editItem == null ||
+                widget.editItem!.status == ItemStatus.saving) ...[
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  l10n.purchasedOnCreditTitle,
+                  style: TextStyle(
+                    color: AppColors.onSurfaceAlpha(1),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  widget.editItem == null
+                      ? l10n.purchasedOnCreditSubtitleNew
+                      : l10n.purchasedOnCreditSubtitleEdit,
+                  style: TextStyle(
+                    color: AppColors.onSurfaceAlpha(0.55),
+                    fontSize: 13,
+                  ),
+                ),
+                value: _purchasedOnCredit,
+                onChanged: (v) => setState(() => _purchasedOnCredit = v),
+              ),
+            ],
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
+              key: ValueKey(_currency),
               initialValue: _currency,
-              dropdownColor: const Color(0xFF1A1A1A),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: '通貨',
-                labelStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+              dropdownColor: AppColors.surface,
+              style: TextStyle(color: AppColors.onSurfaceAlpha(1)),
+              decoration: InputDecoration(labelText: l10n.fieldCurrency),
               items: _currencies
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
@@ -325,19 +382,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _categoryController,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                labelText: 'カテゴリ（任意）',
-                labelStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+              style: TextStyle(
+                color: AppColors.onSurfaceAlpha(1),
+                fontSize: 16,
               ),
+              decoration: InputDecoration(labelText: l10n.fieldCategoryOptional),
             ),
             const SizedBox(height: 16),
             Row(
@@ -352,32 +401,27 @@ class _AddItemScreenState extends State<AddItemScreen> {
                             _targetDate ??
                             DateTime.now().add(const Duration(days: 30)),
                         firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 3650)),
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 3650),
+                        ),
                       );
-                      if (date != null && mounted) setState(() => _targetDate = date);
+                      if (date != null && mounted) {
+                        setState(() => _targetDate = date);
+                      }
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: InputDecorator(
                       decoration: InputDecoration(
-                        labelText: '目標日（任意）',
-                        labelStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFF1A1A1A),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
+                        labelText: l10n.fieldTargetDateOptional,
                       ),
                       child: Text(
                         _targetDate != null
-                            ? '${_targetDate!.year}/${_targetDate!.month}/${_targetDate!.day}'
-                            : '未設定',
+                            ? DateFormat.yMMMd(locale).format(_targetDate!)
+                            : l10n.targetDateUnset,
                         style: TextStyle(
                           color: _targetDate != null
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.5),
+                              ? AppColors.onSurfaceAlpha(1)
+                              : AppColors.onSurfaceAlpha(0.5),
                         ),
                       ),
                     ),
@@ -390,9 +434,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                     child: TextButton(
                       onPressed: () => setState(() => _targetDate = null),
                       child: Text(
-                        'クリア',
+                        l10n.clear,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: AppColors.onSurfaceAlpha(0.7),
                           fontSize: 14,
                         ),
                       ),
@@ -409,11 +453,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
                   icon: Icon(
                     Icons.delete_outline,
                     size: 18,
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: AppColors.onSurfaceAlpha(0.5),
                   ),
-                  label: const Text(
-                    'このアイテムを削除',
-                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 14),
+                  label: Text(
+                    l10n.deleteThisItem,
+                    style: TextStyle(color: AppColors.error, fontSize: 14),
                   ),
                 ),
               ),

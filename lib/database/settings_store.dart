@@ -4,8 +4,39 @@ import 'package:drift/drift.dart';
 
 import 'app_database.dart';
 
-class SettingsStore {
-  SettingsStore(this._db);
+abstract class SettingsStore {
+  Future<String> getBaseCurrency();
+
+  Future<void> setBaseCurrency(String currency);
+
+  Future<Map<String, double>?> getExchangeRates();
+
+  Future<DateTime?> getExchangeRatesUpdatedAt();
+
+  Future<void> setExchangeRates(Map<String, double> rates);
+
+  Future<int?> getNotificationDay();
+
+  Future<int?> getNotificationWeekday();
+
+  Future<void> setNotificationDay(int? day);
+
+  Future<void> setNotificationWeekday(int? weekday);
+
+  Future<int> getNotificationHour();
+
+  Future<int> getNotificationMinute();
+
+  Future<void> setNotificationTime(int hour, int minute);
+
+  /// 空・`system` は端末の言語。`en` / `ja` で固定。
+  Future<String?> getAppLocaleCode();
+
+  Future<void> setAppLocaleCode(String? code);
+}
+
+class DriftSettingsStore implements SettingsStore {
+  DriftSettingsStore(this._db);
 
   final AppDatabase _db;
 
@@ -15,139 +46,128 @@ class SettingsStore {
   static const _keyNotificationWeekday = 'notificationWeekday';
   static const _keyNotificationHour = 'notificationHour';
   static const _keyNotificationMinute = 'notificationMinute';
+  static const _keyAppLocale = 'appLocale';
 
-  Future<String> getBaseCurrency() async {
+  Future<String> _read(String key) async {
     final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals(_keyBaseCurrency)))
+          ..where((t) => t.key.equals(key)))
         .getSingleOrNull();
-    return row?.value ?? 'JPY';
+    return row?.value ?? '';
   }
 
-  Future<void> setBaseCurrency(String currency) async {
+  Future<void> _upsert(String key, String value) async {
     await _db.into(_db.settingsTable).insert(
-          SettingsTableCompanion.insert(
-            key: _keyBaseCurrency,
-            value: currency,
-            updatedAt: DateTime.now(),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
+      SettingsTableCompanion.insert(
+        key: key,
+        value: value,
+        updatedAt: DateTime.now(),
+      ),
+      mode: InsertMode.insertOrReplace,
+    );
   }
 
+  @override
+  Future<String> getBaseCurrency() async {
+    final v = await _read(_keyBaseCurrency);
+    return v.isEmpty ? 'JPY' : v;
+  }
+
+  @override
+  Future<void> setBaseCurrency(String currency) async {
+    await _upsert(_keyBaseCurrency, currency);
+  }
+
+  @override
   Future<Map<String, double>?> getExchangeRates() async {
-    final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals(_keyExchangeRates)))
-        .getSingleOrNull();
-    if (row == null) return null;
-    final decoded = jsonDecode(row.value) as Map<String, dynamic>?;
+    final raw = await _read(_keyExchangeRates);
+    if (raw.isEmpty) return null;
+    final decoded = jsonDecode(raw) as Map<String, dynamic>?;
     return decoded?.map((k, v) => MapEntry(k, (v as num).toDouble()));
   }
 
+  @override
   Future<DateTime?> getExchangeRatesUpdatedAt() async {
-    final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals('${_keyExchangeRates}_updated')))
-        .getSingleOrNull();
-    if (row == null) return null;
-    return DateTime.tryParse(row.value);
+    final raw = await _read('${_keyExchangeRates}_updated');
+    if (raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
   }
 
+  @override
   Future<void> setExchangeRates(Map<String, double> rates) async {
-    await _db.into(_db.settingsTable).insert(
-          SettingsTableCompanion.insert(
-            key: _keyExchangeRates,
-            value: jsonEncode(rates),
-            updatedAt: DateTime.now(),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
-    await _db.into(_db.settingsTable).insert(
-          SettingsTableCompanion.insert(
-            key: '${_keyExchangeRates}_updated',
-            value: DateTime.now().toIso8601String(),
-            updatedAt: DateTime.now(),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
+    await _upsert(_keyExchangeRates, jsonEncode(rates));
+    await _upsert(
+      '${_keyExchangeRates}_updated',
+      DateTime.now().toIso8601String(),
+    );
   }
 
+  @override
   Future<int?> getNotificationDay() async {
-    final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals(_keyNotificationDay)))
-        .getSingleOrNull();
-    return row != null ? int.tryParse(row.value) : null;
+    final v = await _read(_keyNotificationDay);
+    return v.isEmpty ? null : int.tryParse(v);
   }
 
+  @override
   Future<int?> getNotificationWeekday() async {
-    final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals(_keyNotificationWeekday)))
-        .getSingleOrNull();
-    return row != null ? int.tryParse(row.value) : null;
+    final v = await _read(_keyNotificationWeekday);
+    return v.isEmpty ? null : int.tryParse(v);
   }
 
+  @override
   Future<void> setNotificationDay(int? day) async {
     if (day == null) {
       await (_db.delete(_db.settingsTable)
             ..where((t) => t.key.equals(_keyNotificationDay)))
           .go();
     } else {
-      await _db.into(_db.settingsTable).insert(
-            SettingsTableCompanion.insert(
-              key: _keyNotificationDay,
-              value: day.toString(),
-              updatedAt: DateTime.now(),
-            ),
-            mode: InsertMode.insertOrReplace,
-          );
+      await _upsert(_keyNotificationDay, day.toString());
     }
   }
 
+  @override
   Future<void> setNotificationWeekday(int? weekday) async {
     if (weekday == null) {
       await (_db.delete(_db.settingsTable)
             ..where((t) => t.key.equals(_keyNotificationWeekday)))
           .go();
     } else {
-      await _db.into(_db.settingsTable).insert(
-            SettingsTableCompanion.insert(
-              key: _keyNotificationWeekday,
-              value: weekday.toString(),
-              updatedAt: DateTime.now(),
-            ),
-            mode: InsertMode.insertOrReplace,
-          );
+      await _upsert(_keyNotificationWeekday, weekday.toString());
     }
   }
 
+  @override
   Future<int> getNotificationHour() async {
-    final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals(_keyNotificationHour)))
-        .getSingleOrNull();
-    return row != null ? int.tryParse(row.value) ?? 20 : 20;
+    final v = await _read(_keyNotificationHour);
+    return v.isEmpty ? 20 : (int.tryParse(v) ?? 20);
   }
 
+  @override
   Future<int> getNotificationMinute() async {
-    final row = await (_db.select(_db.settingsTable)
-          ..where((t) => t.key.equals(_keyNotificationMinute)))
-        .getSingleOrNull();
-    return row != null ? int.tryParse(row.value) ?? 0 : 0;
+    final v = await _read(_keyNotificationMinute);
+    return v.isEmpty ? 0 : (int.tryParse(v) ?? 0);
   }
 
+  @override
   Future<void> setNotificationTime(int hour, int minute) async {
-    await _db.into(_db.settingsTable).insert(
-          SettingsTableCompanion.insert(
-            key: _keyNotificationHour,
-            value: hour.toString(),
-            updatedAt: DateTime.now(),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
-    await _db.into(_db.settingsTable).insert(
-          SettingsTableCompanion.insert(
-            key: _keyNotificationMinute,
-            value: minute.toString(),
-            updatedAt: DateTime.now(),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
+    await _upsert(_keyNotificationHour, hour.toString());
+    await _upsert(_keyNotificationMinute, minute.toString());
+  }
+
+  @override
+  Future<String?> getAppLocaleCode() async {
+    final v = await _read(_keyAppLocale);
+    if (v.isEmpty || v == 'system') return null;
+    return v;
+  }
+
+  @override
+  Future<void> setAppLocaleCode(String? code) async {
+    if (code == null || code.isEmpty || code == 'system') {
+      await (_db.delete(_db.settingsTable)
+            ..where((t) => t.key.equals(_keyAppLocale)))
+          .go();
+    } else {
+      await _upsert(_keyAppLocale, code);
+    }
   }
 }

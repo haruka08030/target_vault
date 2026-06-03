@@ -1,29 +1,33 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../database/app_database.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
+import '../models/vault_transaction.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
 import '../services/aggregation_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/confirm_dialog.dart';
 import '../utils/format.dart';
+import '../utils/item_image_ref.dart';
+import '../widgets/item_cover_image.dart';
 import 'add_item_screen.dart';
+import 'edit_transaction_sheet.dart';
 import 'quick_add_sheet.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   const ItemDetailScreen({super.key, required this.item});
 
-  final Item item;
+  final VaultItem item;
 
   @override
   State<ItemDetailScreen> createState() => _ItemDetailScreenState();
 }
 
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
-  late Item _item;
+  late VaultItem _item;
 
   @override
   void initState() {
@@ -52,7 +56,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         title: '購入完了',
         content: const Text('このアイテムを購入完了としてマークしますか？'),
         confirmLabel: '完了',
-        confirmColor: const Color(0xFF34D399),
+        confirmColor: AppColors.success,
       );
     } else {
       confirmed = await showAppConfirmDialog(
@@ -62,7 +66,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           '目標額に達していません。前借りで購入し、残り ${formatCurrencyByCode(_item.targetAmount - amount, _item.currency)} を返済として記録しますか？',
         ),
         confirmLabel: '購入する',
-        confirmColor: const Color(0xFFF59E0B),
+        confirmColor: AppColors.warning,
       );
     }
     if (confirmed != true || !mounted) return;
@@ -73,7 +77,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('購入完了！'),
-            backgroundColor: Color(0xFF34D399),
+            backgroundColor: AppColors.success,
           ),
         );
         Navigator.pop(context);
@@ -92,7 +96,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             content: Text(
               '前借り登録（残り ${formatCurrencyByCode(diff, _item.currency)} を返済）',
             ),
-            backgroundColor: const Color(0xFFF59E0B),
+            backgroundColor: AppColors.warning,
           ),
         );
         setState(() {});
@@ -120,22 +124,20 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(
-            Icons.arrow_back,
-            color: Colors.white.withValues(alpha: 0.9),
-          ),
+          icon: Icon(Icons.arrow_back, color: AppColors.onSurfaceAlpha(0.9)),
         ),
         title: Text(
           _item.title,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.95),
-            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Manrope',
           ),
         ),
         actions: [
@@ -146,30 +148,30 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             ).then((_) => setState(() {})),
             icon: Icon(
               Icons.edit_outlined,
-              color: Colors.white.withValues(alpha: 0.7),
+              color: AppColors.onSurfaceAlpha(0.7),
             ),
           ),
           PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
-              color: Colors.white.withValues(alpha: 0.7),
-            ),
-            color: const Color(0xFF1A1A1A),
+            icon: Icon(Icons.more_vert, color: AppColors.onSurfaceAlpha(0.7)),
+            color: AppColors.surface,
             onSelected: (value) {
               if (value == 'delete') _onDeleteItem();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.delete_outline,
-                      color: Color(0xFFEF4444),
+                      color: AppColors.error,
                       size: 20,
                     ),
-                    SizedBox(width: 8),
-                    Text('アイテムを削除', style: TextStyle(color: Color(0xFFEF4444))),
+                    const SizedBox(width: 8),
+                    Text(
+                      'アイテムを削除',
+                      style: const TextStyle(color: AppColors.error),
+                    ),
                   ],
                 ),
               ),
@@ -182,6 +184,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           _item.id,
         ),
         builder: (context, amountSnapshot) {
+          final isLoading =
+              amountSnapshot.connectionState == ConnectionState.waiting;
           final amount = amountSnapshot.data ?? 0;
           final progress = _item.targetAmount > 0
               ? (amount / _item.targetAmount).clamp(0.0, 1.0)
@@ -194,108 +198,171 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_item.imagePath != null &&
-                    File(_item.imagePath!).existsSync())
+                if (itemImageRefIsDisplayable(_item.imagePath))
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(24),
                     child: SizedBox(
-                      height: 200,
+                      height: 240,
                       width: double.infinity,
-                      child: Image.file(
-                        File(_item.imagePath!),
-                        fit: BoxFit.cover,
-                        color: Color.fromRGBO(
-                          255,
-                          255,
-                          255,
-                          isRepaying ? 0.5 : (0.5 + progress * 0.5),
-                        ),
-                        colorBlendMode: BlendMode.saturation,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ItemCoverImage(
+                            imageRef: _item.imagePath!,
+                            fit: BoxFit.cover,
+                            color: Color.fromRGBO(
+                              255,
+                              255,
+                              255,
+                              isLoading
+                                  ? 0.5
+                                  : (isRepaying ? 0.5 : (0.5 + progress * 0.5)),
+                            ),
+                            colorBlendMode: BlendMode.saturation,
+                          ),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.18),
+                                  Colors.black.withValues(alpha: 0.7),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
                 else
                   Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    height: 160,
+                    decoration: AppColors.elevatedCard(radius: 24),
                     child: Icon(
                       Icons.image_outlined,
                       size: 64,
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: AppColors.onSurfaceAlpha(0.5),
                     ),
                   ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      formatCurrencyByCode(amount, _item.currency),
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: isRepaying
-                            ? const Color(0xFFF87171)
-                            : const Color(0xFF34D399),
+                if (isLoading) ...[
+                  Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 140,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.onSurfaceAlpha(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          Container(
+                            width: 100,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: AppColors.onSurfaceAlpha(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      '/ ${formatCurrencyByCode(_item.targetAmount, _item.currency)}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.white.withValues(alpha: 0.6),
+                      const Positioned(
+                        left: 0,
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                            strokeWidth: 2,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 10,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: AlwaysStoppedAnimation(
-                      isRepaying
-                          ? const Color(0xFFF87171)
-                          : const Color(0xFF6366F1),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.onSurfaceAlpha(0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                ),
-                if (_item.targetDate != null) ...[
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        formatCurrencyByCode(amount, _item.currency),
+                        style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Manrope',
+                          color: isRepaying
+                              ? AppColors.errorLight
+                              : AppColors.success,
+                        ),
+                      ),
+                      Text(
+                        '/ ${formatCurrencyByCode(_item.targetAmount, _item.currency)}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: AppColors.onSurfaceAlpha(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 10,
+                      backgroundColor: AppColors.onSurfaceAlpha(0.1),
+                      valueColor: AlwaysStoppedAnimation(
+                        isRepaying ? AppColors.errorLight : AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+                if (!isLoading && _item.targetDate != null) ...[
                   const SizedBox(height: 20),
                   _PredictionSection(item: _item, currentAmount: amount),
                 ],
-                if (canPurchase) ...[
+                if (!isLoading && canPurchase) ...[
                   const SizedBox(height: 24),
                   FilledButton.icon(
                     onPressed: _onPurchase,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.primaryTextOnLight,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                     icon: const Icon(Icons.shopping_cart_checkout),
                     label: const Text('購入する'),
                   ),
                 ],
-                if (isRepaying) ...[
+                if (!isLoading && isRepaying) ...[
                   const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                      color: AppColors.warning.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: const Color(0xFFF59E0B),
+                          color: AppColors.warning,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -303,7 +370,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                           child: Text(
                             '前借り中：返済入金を記録してください',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                              color: AppColors.onSurfaceAlpha(0.9),
                               fontSize: 14,
                             ),
                           ),
@@ -321,7 +388,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: AppColors.onSurfaceAlpha(0.9),
                       ),
                     ),
                     FilledButton.icon(
@@ -335,14 +402,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         ),
                       ),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366F1),
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.primaryTextOnLight,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
                         ),
                       ),
                       icon: const Icon(Icons.add, size: 20),
-                      label: const Text('入金'),
+                      label: const Text('記録'),
                     ),
                   ],
                 ),
@@ -360,12 +428,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 class _PredictionSection extends StatelessWidget {
   const _PredictionSection({required this.item, required this.currentAmount});
 
-  final Item item;
+  final VaultItem item;
   final double currentAmount;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Transaction>>(
+    return StreamBuilder<List<VaultTransaction>>(
       stream: context.read<TransactionRepository>().watchByItem(item.id),
       builder: (context, txSnapshot) {
         final txs = txSnapshot.data ?? [];
@@ -386,9 +454,9 @@ class _PredictionSection extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            border: Border.all(color: AppColors.onSurfaceAlpha(0.06)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,12 +468,15 @@ class _PredictionSection extends StatelessWidget {
                     '目標日',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: AppColors.onSurfaceAlpha(0.6),
                     ),
                   ),
                   Text(
                     dateFormat.format(targetDate),
-                    style: const TextStyle(fontSize: 14, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.onSurfaceAlpha(1),
+                    ),
                   ),
                 ],
               ),
@@ -418,7 +489,7 @@ class _PredictionSection extends StatelessWidget {
                       '予測日',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: AppColors.onSurfaceAlpha(0.6),
                       ),
                     ),
                     Row(
@@ -427,7 +498,7 @@ class _PredictionSection extends StatelessWidget {
                           Icon(
                             Icons.warning_amber_rounded,
                             size: 18,
-                            color: const Color(0xFFF87171),
+                            color: AppColors.errorLight,
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -436,8 +507,8 @@ class _PredictionSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 14,
                             color: isLate
-                                ? const Color(0xFFF87171)
-                                : Colors.white,
+                                ? AppColors.errorLight
+                                : AppColors.onSurfaceAlpha(1),
                           ),
                         ),
                       ],
@@ -450,7 +521,7 @@ class _PredictionSection extends StatelessWidget {
                     '${predicted.difference(targetDate).inDays}日遅れの見込み',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFFF87171),
+                      color: AppColors.errorLight,
                     ),
                   ),
                 ],
@@ -471,23 +542,19 @@ class _TransactionList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Transaction>>(
+    return StreamBuilder<List<VaultTransaction>>(
       stream: context.read<TransactionRepository>().watchByItem(itemId),
       builder: (context, snapshot) {
         final txs = snapshot.data ?? [];
         if (txs.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-            ),
+            decoration: AppColors.elevatedCard(radius: 16),
             child: Center(
               child: Text(
                 'まだ入出金がありません',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppColors.onSurfaceAlpha(0.5),
                   fontSize: 14,
                 ),
               ),
@@ -507,7 +574,7 @@ class _TransactionList extends StatelessWidget {
 class _TransactionTile extends StatelessWidget {
   const _TransactionTile({required this.transaction, required this.currency});
 
-  final Transaction transaction;
+  final VaultTransaction transaction;
 
   final String currency;
 
@@ -524,10 +591,10 @@ class _TransactionTile extends StatelessWidget {
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+          color: AppColors.error.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: Icon(Icons.delete, color: AppColors.onSurfaceAlpha(1)),
       ),
       confirmDismiss: (_) async {
         final result = await showAppConfirmDialog(
@@ -542,50 +609,59 @@ class _TransactionTile extends StatelessWidget {
       onDismissed: (_) => context
           .read<TransactionRepository>()
           .deleteTransaction(transaction.id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  dateFormat.format(transaction.date),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.6),
-                  ),
-                ),
-                if (transaction.note != null && transaction.note!.isNotEmpty)
+      child: InkWell(
+        onTap: () {
+          showModalBottomSheet<void>(
+            context: context,
+            backgroundColor: Colors.transparent,
+            isScrollControlled: true,
+            builder: (ctx) => EditTransactionSheet(
+              transaction: transaction,
+              currency: currency,
+              onSaved: () {},
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: AppColors.elevatedCard(radius: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    transaction.note!,
+                    dateFormat.format(transaction.date),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: AppColors.onSurfaceAlpha(0.6),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-              ],
-            ),
-            Text(
-              '${isDeposit ? '+' : ''}${formatCurrencyByCode(transaction.amount, currency)}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDeposit
-                    ? const Color(0xFF34D399)
-                    : const Color(0xFFF87171),
+                  if (transaction.note != null && transaction.note!.isNotEmpty)
+                    Text(
+                      transaction.note!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.onSurfaceAlpha(0.5),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
-            ),
-          ],
+              Text(
+                '${isDeposit ? '+' : ''}${formatCurrencyByCode(transaction.amount, currency)}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDeposit ? AppColors.success : AppColors.errorLight,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

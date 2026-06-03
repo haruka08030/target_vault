@@ -1,26 +1,18 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
-import 'database_connection.dart';
-import 'memory_test_executor.dart';
+import '../models/item_status.dart';
+import 'database_connection_io.dart';
+import 'memory_test_executor_io.dart';
 
 part 'app_database.g.dart';
 
-enum ItemStatus {
-  saving,
-  repaying,
-  completed;
-
-  String get dbValue => name;
-  static ItemStatus fromDb(String value) => ItemStatus.values.firstWhere(
-    (e) => e.dbValue == value,
-    orElse: () => ItemStatus.saving,
-  );
-}
-
 class ItemStatusConverter extends TypeConverter<ItemStatus, String> {
+  const ItemStatusConverter();
+
   @override
   ItemStatus fromSql(String fromDb) => ItemStatus.fromDb(fromDb);
+
   @override
   String toSql(ItemStatus value) => value.dbValue;
 }
@@ -33,7 +25,7 @@ class Items extends Table {
   TextColumn get imagePath => text().nullable()();
   DateTimeColumn get targetDate => dateTime().nullable()();
   TextColumn get category => text().nullable()();
-  TextColumn get status => text().map(ItemStatusConverter())();
+  TextColumn get status => text().map(const ItemStatusConverter())();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -68,7 +60,6 @@ class SettingsTable extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connectAppDatabaseExecutor());
 
-  /// メモリ SQLite。Widget テスト用（ストリームを同期的に閉じる）。
   @visibleForTesting
   AppDatabase.memoryForTests() : super(memoryTestExecutor());
 

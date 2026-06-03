@@ -91,6 +91,18 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       ).withConverter<ItemStatus>($ItemsTable.$converterstatus);
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -123,6 +135,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     targetDate,
     category,
     status,
+    sortOrder,
     createdAt,
     updatedAt,
   ];
@@ -186,6 +199,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
       );
     }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -245,6 +264,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
           data['${effectivePrefix}status'],
         )!,
       ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -262,7 +285,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   }
 
   static TypeConverter<ItemStatus, String> $converterstatus =
-      ItemStatusConverter();
+      const ItemStatusConverter();
 }
 
 class Item extends DataClass implements Insertable<Item> {
@@ -274,6 +297,7 @@ class Item extends DataClass implements Insertable<Item> {
   final DateTime? targetDate;
   final String? category;
   final ItemStatus status;
+  final int sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Item({
@@ -285,6 +309,7 @@ class Item extends DataClass implements Insertable<Item> {
     this.targetDate,
     this.category,
     required this.status,
+    required this.sortOrder,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -309,6 +334,7 @@ class Item extends DataClass implements Insertable<Item> {
         $ItemsTable.$converterstatus.toSql(status),
       );
     }
+    map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -330,6 +356,7 @@ class Item extends DataClass implements Insertable<Item> {
           ? const Value.absent()
           : Value(category),
       status: Value(status),
+      sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -349,6 +376,7 @@ class Item extends DataClass implements Insertable<Item> {
       targetDate: serializer.fromJson<DateTime?>(json['targetDate']),
       category: serializer.fromJson<String?>(json['category']),
       status: serializer.fromJson<ItemStatus>(json['status']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -365,6 +393,7 @@ class Item extends DataClass implements Insertable<Item> {
       'targetDate': serializer.toJson<DateTime?>(targetDate),
       'category': serializer.toJson<String?>(category),
       'status': serializer.toJson<ItemStatus>(status),
+      'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -379,6 +408,7 @@ class Item extends DataClass implements Insertable<Item> {
     Value<DateTime?> targetDate = const Value.absent(),
     Value<String?> category = const Value.absent(),
     ItemStatus? status,
+    int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Item(
@@ -390,6 +420,7 @@ class Item extends DataClass implements Insertable<Item> {
     targetDate: targetDate.present ? targetDate.value : this.targetDate,
     category: category.present ? category.value : this.category,
     status: status ?? this.status,
+    sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -407,6 +438,7 @@ class Item extends DataClass implements Insertable<Item> {
           : this.targetDate,
       category: data.category.present ? data.category.value : this.category,
       status: data.status.present ? data.status.value : this.status,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -423,6 +455,7 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('targetDate: $targetDate, ')
           ..write('category: $category, ')
           ..write('status: $status, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -439,6 +472,7 @@ class Item extends DataClass implements Insertable<Item> {
     targetDate,
     category,
     status,
+    sortOrder,
     createdAt,
     updatedAt,
   );
@@ -454,6 +488,7 @@ class Item extends DataClass implements Insertable<Item> {
           other.targetDate == this.targetDate &&
           other.category == this.category &&
           other.status == this.status &&
+          other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -467,6 +502,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<DateTime?> targetDate;
   final Value<String?> category;
   final Value<ItemStatus> status;
+  final Value<int> sortOrder;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -479,6 +515,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.targetDate = const Value.absent(),
     this.category = const Value.absent(),
     this.status = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -492,6 +529,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.targetDate = const Value.absent(),
     this.category = const Value.absent(),
     required ItemStatus status,
+    this.sortOrder = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -510,6 +548,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<DateTime>? targetDate,
     Expression<String>? category,
     Expression<String>? status,
+    Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -523,6 +562,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (targetDate != null) 'target_date': targetDate,
       if (category != null) 'category': category,
       if (status != null) 'status': status,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -538,6 +578,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<DateTime?>? targetDate,
     Value<String?>? category,
     Value<ItemStatus>? status,
+    Value<int>? sortOrder,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -551,6 +592,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       targetDate: targetDate ?? this.targetDate,
       category: category ?? this.category,
       status: status ?? this.status,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -586,6 +628,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
         $ItemsTable.$converterstatus.toSql(status.value),
       );
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -609,6 +654,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('targetDate: $targetDate, ')
           ..write('category: $category, ')
           ..write('status: $status, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -1323,6 +1369,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<DateTime?> targetDate,
       Value<String?> category,
       required ItemStatus status,
+      Value<int> sortOrder,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -1337,6 +1384,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<DateTime?> targetDate,
       Value<String?> category,
       Value<ItemStatus> status,
+      Value<int> sortOrder,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -1413,6 +1461,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
         column: $table.status,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
@@ -1499,6 +1552,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -1546,6 +1604,9 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<ItemStatus, String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1615,6 +1676,7 @@ class $$ItemsTableTableManager
                 Value<DateTime?> targetDate = const Value.absent(),
                 Value<String?> category = const Value.absent(),
                 Value<ItemStatus> status = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -1627,6 +1689,7 @@ class $$ItemsTableTableManager
                 targetDate: targetDate,
                 category: category,
                 status: status,
+                sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1641,6 +1704,7 @@ class $$ItemsTableTableManager
                 Value<DateTime?> targetDate = const Value.absent(),
                 Value<String?> category = const Value.absent(),
                 required ItemStatus status,
+                Value<int> sortOrder = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -1653,6 +1717,7 @@ class $$ItemsTableTableManager
                 targetDate: targetDate,
                 category: category,
                 status: status,
+                sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

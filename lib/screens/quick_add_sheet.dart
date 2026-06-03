@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../database/app_database.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
+import '../theme/app_colors.dart';
+import '../utils/thousands_separator_input_formatter.dart';
 
 class QuickAddSheet extends StatefulWidget {
   const QuickAddSheet({super.key, required this.item, required this.onAdded});
 
-  final Item item;
+  final VaultItem item;
   final VoidCallback onAdded;
 
   @override
@@ -18,12 +21,14 @@ class QuickAddSheet extends StatefulWidget {
 
 class _QuickAddSheetState extends State<QuickAddSheet> {
   final _controller = TextEditingController();
+  final _noteController = TextEditingController();
   bool _isLoading = false;
   bool _isWithdrawal = false; // false: 入金, true: 出金
 
   @override
   void dispose() {
     _controller.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -34,7 +39,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('正しい金額を入力してください'),
-          backgroundColor: Color(0xFFF59E0B),
+          backgroundColor: AppColors.warning,
         ),
       );
       return;
@@ -44,8 +49,13 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     final txRepo = context.read<TransactionRepository>();
     final itemRepo = context.read<ItemRepository>();
 
+    final note = _noteController.text.trim();
     setState(() => _isLoading = true);
-    await txRepo.addTransaction(itemId: widget.item.id, amount: amount);
+    await txRepo.addTransaction(
+      itemId: widget.item.id,
+      amount: amount,
+      note: note.isEmpty ? null : note,
+    );
     final newBalance = await txRepo.getCurrentAmount(widget.item.id);
     if (widget.item.status == ItemStatus.repaying && newBalance >= 0) {
       await itemRepo.updateItemStatus(widget.item.id, ItemStatus.completed);
@@ -64,9 +74,10 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
         top: 24,
         bottom: MediaQuery.of(context).padding.bottom + 24,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.96),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -77,7 +88,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: AppColors.onSurfaceAlpha(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -106,11 +117,13 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                   style: ButtonStyle(
                     backgroundColor: WidgetStateProperty.resolveWith((states) {
                       if (states.contains(WidgetState.selected)) {
-                        return const Color(0xFF6366F1).withValues(alpha: 0.3);
+                        return AppColors.primary.withValues(alpha: 0.3);
                       }
-                      return Colors.white.withValues(alpha: 0.08);
+                      return AppColors.onSurfaceAlpha(0.08);
                     }),
-                    foregroundColor: WidgetStateProperty.all(Colors.white),
+                    foregroundColor: WidgetStateProperty.all(
+                      AppColors.onSurfaceAlpha(1),
+                    ),
                   ),
                 ),
               ),
@@ -119,10 +132,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
           const SizedBox(height: 16),
           Text(
             widget.item.title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.6),
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           TextField(
@@ -130,40 +140,66 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+              ThousandsSeparatorInputFormatter(
+                decimalAllowed: widget.item.currency != 'JPY',
+              ),
             ],
-            style: const TextStyle(
-              fontSize: 32,
+            style: TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 40,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: AppColors.onSurfaceAlpha(1),
             ),
             decoration: InputDecoration(
               hintText: '0',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+              hintStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.3)),
               suffixText: _currencySuffix(widget.item.currency),
               suffixStyle: TextStyle(
                 fontSize: 18,
-                color: Colors.white.withValues(alpha: 0.6),
+                color: AppColors.onSurfaceAlpha(0.6),
               ),
               filled: true,
-              fillColor: const Color(0xFF0D0D0D),
+              fillColor: AppColors.surfaceLow,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
             ),
             onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _noteController,
+            decoration: InputDecoration(
+              hintText: 'メモ（任意）',
+              hintStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.3)),
+              filled: true,
+              fillColor: AppColors.surfaceLow,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.onSurfaceAlpha(0.9),
+            ),
+            maxLines: 2,
           ),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _isLoading ? null : _submit,
             style: FilledButton.styleFrom(
               backgroundColor: _isWithdrawal
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF6366F1),
+                  ? AppColors.warning
+                  : AppColors.primary,
+              foregroundColor: _isWithdrawal
+                  ? AppColors.primaryTextOnLight
+                  : AppColors.primaryTextOnLight,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
             child: _isLoading

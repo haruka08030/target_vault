@@ -2,19 +2,15 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../database/app_database.dart';
+import '../database/vault_mappers.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
+import 'transaction_repository.dart';
 
-class ItemRepository {
-  ItemRepository(this._db);
+abstract class ItemRepository {
+  Stream<List<VaultItem>> watchAllItems();
 
-  final AppDatabase _db;
-  final _uuid = const Uuid();
-
-  Stream<List<Item>> watchAllItems() =>
-      (_db.select(_db.items)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-          .watch();
-
-  Future<Item?> getItem(String id) =>
-      (_db.select(_db.items)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<VaultItem?> getItem(String id);
 
   Future<void> createItem({
     required String title,
@@ -23,58 +19,179 @@ class ItemRepository {
     String? imagePath,
     DateTime? targetDate,
     String? category,
-  }) async {
-    final now = DateTime.now();
-    await _db.into(_db.items).insert(
-          ItemsCompanion.insert(
-            id: _uuid.v4(),
-            title: title,
-            targetAmount: targetAmount,
-            currency: Value(currency ?? 'JPY'),
-            imagePath: Value(imagePath),
-            targetDate: Value(targetDate),
-            category: Value(category),
-            status: ItemStatus.saving,
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-  }
+    bool purchasedOnCredit = false,
+  });
+
+  Future<bool> convertSavingItemToRepayingOnCredit(
+    String itemId, {
+    required double targetAmount,
+  });
 
   Future<void> updateItem(
     String id, {
-    String? title,
-    double? targetAmount,
+    required String title,
+    required double targetAmount,
+    required String currency,
+    required DateTime? targetDate,
+    required String? category,
+    required String? imagePath,
+  });
+
+  Future<void> updateItemStatus(String id, ItemStatus status);
+
+  Future<void> deleteItem(String id);
+
+  Future<void> updateItemsOrder(List<String> orderedIds);
+}
+
+class DriftItemRepository implements ItemRepository {
+  DriftItemRepository(this._db, this._transactions);
+
+  final AppDatabase _db;
+  final TransactionRepository _transactions;
+  final _uuid = const Uuid();
+
+  @override
+  Stream<List<VaultItem>> watchAllItems() {
+    return _db.select(_db.items).watch().map((rows) {
+      final list = rows.map(vaultItemFromRow).toList();
+      list.sort(compareVaultItems);
+      return list;
+    });
+  }
+
+  @override
+  Future<VaultItem?> getItem(String id) async {
+    final row = await (_db.select(_db.items)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    return row == null ? null : vaultItemFromRow(row);
+  }
+
+  Future<int> _nextSortOrder() async {
+    final rows = await (_db.select(_db.items)
+          ..orderBy([(t) => OrderingTerm.desc(t.sortOrder)])
+          ..limit(1))
+        .get();
+    if (rows.isEmpty) return 0;
+    return rows.first.sortOrder + 1;
+  }
+
+  @override
+  Future<void> createItem({
+    required String title,
+    required double targetAmount,
     String? currency,
-    Value<String?>? imagePath,
+    String? imagePath,
     DateTime? targetDate,
     String? category,
+    bool purchasedOnCredit = false,
+  }) async {
+    final now = DateTime.now();
+    final id = _uuid.v4();
+    final status =
+        purchasedOnCredit ? ItemStatus.repaying : ItemStatus.saving;
+    final nextOrder = await _nextSortOrder();
+
+    await _db.into(_db.items).insert(
+      ItemsCompanion.insert(
+        id: id,
+        title: title,
+        targetAmount: targetAmount,
+        currency: Value(currency ?? 'JPY'),
+        imagePath: Value(imagePath),
+        targetDate: Value(targetDate),
+        category: Value(category),
+        status: status,
+        sortOrder: Value(nextOrder),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    if (purchasedOnCredit) {
+      await _transactions.addTransaction(
+        itemId: id,
+        amount: -targetAmount,
+        date: now,
+        note: '追加時: 前借りで購入済み',
+      );
+    }
+  }
+
+  @override
+  Future<bool> convertSavingItemToRepayingOnCredit(
+    String itemId, {
+    required double targetAmount,
+  }) async {
+    final item = await getItem(itemId);
+    if (item == null || item.status != ItemStatus.saving) return false;
+    final now = DateTime.now();
+    await _transactions.addTransaction(
+      itemId: itemId,
+      amount: -targetAmount,
+      date: now,
+      note: '編集: 前借りで購入済みとして登録',
+    );
+    await (_db.update(_db.items)..where((t) => t.id.equals(itemId))).write(
+      ItemsCompanion(
+        status: const Value(ItemStatus.repaying),
+        updatedAt: Value(now),
+      ),
+    );
+    return true;
+  }
+
+  @override
+  Future<void> updateItem(
+    String id, {
+    required String title,
+    required double targetAmount,
+    required String currency,
+    required DateTime? targetDate,
+    required String? category,
+    required String? imagePath,
   }) async {
     await (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
-          ItemsCompanion(
-            title: title != null ? Value(title) : const Value.absent(),
-            targetAmount:
-                targetAmount != null ? Value(targetAmount) : const Value.absent(),
-            currency: currency != null ? Value(currency) : const Value.absent(),
-            imagePath: imagePath ?? const Value.absent(),
-            targetDate:
-                targetDate != null ? Value(targetDate) : const Value.absent(),
-            category: category != null ? Value(category) : const Value.absent(),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+      ItemsCompanion(
+        title: Value(title),
+        targetAmount: Value(targetAmount),
+        currency: Value(currency),
+        targetDate: Value(targetDate),
+        category: Value(category),
+        imagePath: Value(imagePath),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
+  @override
   Future<void> updateItemStatus(String id, ItemStatus status) async {
     await (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
-          ItemsCompanion(
-            status: Value(status),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+      ItemsCompanion(
+        status: Value(status),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
+  @override
   Future<void> deleteItem(String id) async {
     await (_db.delete(_db.items)..where((t) => t.id.equals(id))).go();
+  }
+
+  @override
+  Future<void> updateItemsOrder(List<String> orderedIds) async {
+    final now = DateTime.now();
+    await _db.transaction(() async {
+      for (var i = 0; i < orderedIds.length; i++) {
+        await (_db.update(_db.items)..where((t) => t.id.equals(orderedIds[i])))
+            .write(
+          ItemsCompanion(
+            sortOrder: Value(i),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+    });
   }
 }

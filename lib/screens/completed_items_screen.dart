@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../database/app_database.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
 import '../repositories/item_repository.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
@@ -31,7 +32,7 @@ class CompletedItemsScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: StreamBuilder<List<Item>>(
+      body: StreamBuilder<List<VaultItem>>(
         stream: context.read<ItemRepository>().watchAllItems(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -81,7 +82,7 @@ class CompletedItemsScreen extends StatelessWidget {
 class _CompletedItemCard extends StatelessWidget {
   const _CompletedItemCard({required this.item});
 
-  final Item item;
+  final VaultItem item;
 
   @override
   Widget build(BuildContext context) {

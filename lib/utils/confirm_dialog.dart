@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 /// アプリ共通のダークテーマ確認ダイアログ。
 /// 重要な操作・破壊的操作の前に必ずこれを使い、画面ごとに AlertDialog をコピペしない。
 Future<bool?> showAppConfirmDialog(
@@ -12,18 +14,17 @@ Future<bool?> showAppConfirmDialog(
   Color? confirmColor,
 }) async {
   final color =
-      confirmColor ??
-      (isDestructive ? const Color(0xFFEF4444) : const Color(0xFF6366F1));
+      confirmColor ?? (isDestructive ? AppColors.error : AppColors.primary);
   return showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: AppColors.surface,
       title: Text(
         title,
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.95)),
+        style: TextStyle(color: AppColors.onSurfaceAlpha(0.95)),
       ),
       content: DefaultTextStyle(
-        style: const TextStyle(color: Colors.white70),
+        style: TextStyle(color: AppColors.onSurfaceAlpha(0.7)),
         child: content,
       ),
       actions: [

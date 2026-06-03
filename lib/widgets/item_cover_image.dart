@@ -6,7 +6,7 @@ import 'item_cover_image_io.dart'
     if (dart.library.html) 'item_cover_image_web.dart'
     as platform;
 
-/// ローカルファイルパスまたは `data:image/...;base64,...` を表示する。
+/// ローカルファイルパス、`data:image/...;base64,...`、または `http(s)` URL を表示する。
 class ItemCoverImage extends StatelessWidget {
   const ItemCoverImage({
     super.key,
@@ -23,6 +23,15 @@ class ItemCoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (imageRef.startsWith('http://') || imageRef.startsWith('https://')) {
+      return Image.network(
+        imageRef,
+        fit: fit,
+        color: color,
+        colorBlendMode: colorBlendMode,
+        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+      );
+    }
     if (imageRef.startsWith('data:image/')) {
       final idx = imageRef.indexOf(',');
       if (idx < 0 || idx >= imageRef.length - 1) {

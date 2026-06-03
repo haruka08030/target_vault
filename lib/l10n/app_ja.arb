@@ -1,0 +1,78 @@
+{
+  "@@locale": "ja",
+  "goalsSectionTitle": "Goals",
+  "totalSavings": "貯めたお金",
+  "totalDebt": "借りたお金",
+  "goalsViewActive": "進行中",
+  "goalsViewCompleted": "完了",
+  "categoryUnset": "カテゴリなし",
+  "exchangeRateFetchFailed": "為替レートの取得に失敗しました",
+  "emptyGoalsPrompt": "アイテムを追加して貯金を始めましょう",
+  "addItem": "アイテムを追加",
+  "noCompletedGoalsYet": "まだ完了したものはありません",
+  "purchasedFor": "{amount} で購入済み",
+  "@purchasedFor": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "editItem": "アイテムを編集",
+  "save": "保存",
+  "imageSaveFailed": "画像の保存に失敗しました",
+  "titleAndTargetRequired": "タイトルと目標金額を入力してください",
+  "convertToRepayingFailed": "返済中への切り替えに失敗しました（貯金中のみ可能です）",
+  "deleteItemTitle": "アイテムを削除",
+  "deleteItemConfirm": "「{title}」を削除しますか？ 入出金履歴も一緒に削除されます。",
+  "@deleteItemConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "delete": "削除",
+  "itemDeleted": "アイテムを削除しました",
+  "removePhoto": "写真を削除",
+  "addPhotoOptional": "写真を追加（任意）",
+  "fieldTitle": "タイトル",
+  "fieldTargetAmount": "目標金額",
+  "purchasedOnCreditTitle": "すでに購入済み（返済として登録）",
+  "purchasedOnCreditSubtitleNew": "目標金額ぶんの前借りとして記録します",
+  "purchasedOnCreditSubtitleEdit": "保存時に、入力した目標金額ぶんの前借りとして記録します",
+  "fieldCurrency": "通貨",
+  "fieldCategoryOptional": "カテゴリ（任意）",
+  "fieldTargetDateOptional": "目標日（任意）",
+  "targetDateUnset": "未設定",
+  "clear": "クリア",
+  "deleteThisItem": "このアイテムを削除",
+  "settingsTitle": "設定",
+  "settingsLanguage": "言語",
+  "languageSystem": "端末の設定に合わせる",
+  "languageJapanese": "日本語",
+  "languageEnglish": "English",
+  "settingsBaseCurrency": "ベース通貨",
+  "settingsNotifications": "通知",
+  "settingsNotificationsWebUnavailable": "Web版ではローカル通知は利用できません。",
+  "settingsNotifTiming": "通知のタイミング",
+  "settingsNotifMonthly": "毎月",
+  "settingsNotifWeekly": "毎週",
+  "settingsNotifOff": "オフ",
+  "settingsNotifWhichDay": "毎月の何日？",
+  "settingsNotifMonthlyDay": "毎月{day}日",
+  "@settingsNotifMonthlyDay": {
+    "placeholders": {
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsNotifWhichWeekday": "毎週の何曜日？",
+  "settingsNotifTime": "通知時刻",
+  "settingsNotifApply": "通知を設定",
+  "settingsNotifDisabledSnack": "通知をオフにしました",
+  "settingsNotifEnabledSnack": "通知を設定しました",
+  "notifBodyDaily": "今日の入金を記録しましょう",
+  "notifBodyWeekly": "今週の入金を記録しましょう"
+}

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../database/app_database.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
 import '../database/settings_store.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
 import '../services/aggregation_service.dart';
 import '../services/exchange_rate_service.dart';
+import '../l10n/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import '../utils/item_image_ref.dart';
 import '../widgets/item_cover_image.dart';
 import 'add_item_screen.dart';
-import 'completed_items_screen.dart';
 import 'item_detail_screen.dart';
 import 'settings_screen.dart';
 
@@ -23,8 +24,12 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+enum _GoalsView { active, completed }
+
 class _HomeScreenState extends State<HomeScreen> {
-  /// カテゴリフィルタ: null=すべて, ''=未設定, それ以外=カテゴリ名
+  _GoalsView _goalsView = _GoalsView.active;
+
+  /// カテゴリフィルタ（進行中のみ）: null=すべて, ''=カテゴリなし, それ以外=カテゴリ名
   String? _selectedCategoryFilter;
 
   @override
@@ -44,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (rates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('為替レートの取得に失敗しました'),
+          content: Text(AppLocalizations.of(context)!.exchangeRateFetchFailed),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -55,45 +60,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-        child: Container(
-          height: 64,
-          decoration: AppColors.glassCard(radius: 999),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              const _BottomNavIcon(
-                icon: Icons.account_balance_wallet,
-                active: true,
-              ),
-              _BottomNavIcon(
-                icon: Icons.payments_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddItemScreen()),
-                ),
-              ),
-              _BottomNavIcon(
-                icon: Icons.receipt_long_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CompletedItemsScreen(),
-                  ),
-                ),
-              ),
-              _BottomNavIcon(
-                icon: Icons.person_outline,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-            ],
-          ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AddItemScreen()),
         ),
+        backgroundColor: AppColors.secondary,
+        foregroundColor: AppColors.primaryTextOnLight,
+        elevation: 6,
+        highlightElevation: 10,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add, size: 28),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -103,29 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppColors.surfaceHighest,
-                          child: Icon(
-                            Icons.person,
-                            size: 18,
-                            color: AppColors.onSurfaceAlpha(0.75),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'TARGET VAULT',
-                          style: TextStyle(
-                            fontFamily: 'Manrope',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'TARGET VAULT',
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.push(
@@ -152,43 +117,18 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Active Goals',
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurfaceAlpha(0.9),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AddItemScreen(),
-                        ),
-                      ),
-                      icon: Icon(
-                        Icons.add,
-                        size: 20,
-                        color: AppColors.secondary,
-                      ),
-                      label: Text(
-                        'Add',
-                        style: TextStyle(
-                          color: AppColors.secondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  AppLocalizations.of(context)!.goalsSectionTitle,
+                  style: TextStyle(
+                    fontFamily: 'Manrope',
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSurfaceAlpha(0.9),
+                  ),
                 ),
               ),
             ),
-            StreamBuilder<List<Item>>(
+            StreamBuilder<List<VaultItem>>(
               stream: context.read<ItemRepository>().watchAllItems(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -207,13 +147,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 final completed = all
                     .where((i) => i.status == ItemStatus.completed)
                     .toList();
-                final showCompletedLink = completed.isNotEmpty;
+
+                if (_goalsView == _GoalsView.completed) {
+                  return _buildCompletedGoalsSliver(completed);
+                }
 
                 final categorySet = items.map((i) => i.category).toSet();
                 final nonNullCategories =
                     categorySet.whereType<String>().toList()..sort();
-                final filterOptions = <String?>[
-                  null,
+                final categoryFilterOptions = <String>[
                   if (categorySet.contains(null)) '',
                   ...nonNullCategories,
                 ];
@@ -225,51 +167,72 @@ class _HomeScreenState extends State<HomeScreen> {
                           .where((i) => i.category == _selectedCategoryFilter)
                           .toList();
 
-                if (items.isEmpty && !showCompletedLink) {
-                  return SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.savings_outlined,
-                              size: 64,
-                              color: AppColors.onSurfaceAlpha(0.3),
+                if (items.isEmpty) {
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverMainAxisGroup(
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildGoalsFiltersArea(
+                              categoryFilterOptions: const [],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'アイテムを追加して貯金を始めましょう',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppColors.onSurfaceAlpha(0.5),
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            FilledButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const AddItemScreen(),
-                                ),
-                              ),
-                              icon: const Icon(Icons.add, size: 20),
-                              label: const Text('アイテムを追加'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 14,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.savings_outlined,
+                                    size: 64,
+                                    color: AppColors.onSurfaceAlpha(0.3),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.emptyGoalsPrompt,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppColors.onSurfaceAlpha(0.5),
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  FilledButton.icon(
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const AddItemScreen(),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.add, size: 20),
+                                    label: Text(
+                                      AppLocalizations.of(context)!.addItem,
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -281,74 +244,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: FilterChip(
-                                    label: const Text('すべて'),
-                                    selected: _selectedCategoryFilter == null,
-                                    onSelected: (_) => setState(
-                                      () => _selectedCategoryFilter = null,
-                                    ),
-                                    selectedColor: AppColors.primary.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    backgroundColor: AppColors.surfaceLow,
-                                    side: BorderSide(
-                                      color: AppColors.outlineVariant
-                                          .withValues(alpha: 0.5),
-                                    ),
-                                    checkmarkColor: AppColors.primary,
-                                    labelStyle: TextStyle(
-                                      color: _selectedCategoryFilter == null
-                                          ? AppColors.onSurfaceAlpha(1)
-                                          : AppColors.onSurfaceAlpha(0.8),
-                                    ),
-                                  ),
-                                ),
-                                ...filterOptions.where((v) => v != null).map((
-                                  cat,
-                                ) {
-                                  final label = cat == '' ? '未設定' : cat!;
-                                  final selected =
-                                      _selectedCategoryFilter == cat;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: FilterChip(
-                                      label: Text(label),
-                                      selected: selected,
-                                      onSelected: (_) => setState(
-                                        () => _selectedCategoryFilter = cat,
-                                      ),
-                                      selectedColor: AppColors.primary
-                                          .withValues(alpha: 0.3),
-                                      backgroundColor: AppColors.surfaceLow,
-                                      side: BorderSide(
-                                        color: AppColors.outlineVariant
-                                            .withValues(alpha: 0.5),
-                                      ),
-                                      checkmarkColor: AppColors.primary,
-                                      labelStyle: TextStyle(
-                                        color: selected
-                                            ? AppColors.onSurfaceAlpha(1)
-                                            : AppColors.onSurfaceAlpha(0.8),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
+                          child: _buildGoalsFiltersArea(
+                            categoryFilterOptions: categoryFilterOptions,
                           ),
                         ),
                       ),
                       _buildItemListSliver(
                         filteredItems: filteredItems,
-                        showCompletedLink: showCompletedLink,
-                        completedCount: completed.length,
                         isReorderable: _selectedCategoryFilter == null,
                       ),
                     ],
@@ -356,116 +258,202 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            const SliverToBoxAdapter(child: SizedBox(height: 88)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildItemListSliver({
-    required List<Item> filteredItems,
-    required bool showCompletedLink,
-    required int completedCount,
-    required bool isReorderable,
-  }) {
-    final completedLink = showCompletedLink
-        ? SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 20),
-              child: TextButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CompletedItemsScreen(),
-                  ),
-                ),
-                icon: Icon(
-                  Icons.check_circle_outline,
-                  size: 20,
-                  color: AppColors.onSurfaceAlpha(0.7),
-                ),
-                label: Text(
-                  '完了したアイテム（$completedCount）を見る',
-                  style: TextStyle(
-                    color: AppColors.onSurfaceAlpha(0.7),
-                    fontSize: 14,
-                  ),
-                ),
+  static const double _goalsSegmentHeight = 44;
+
+  /// 進行中/完了セグメント＋カテゴリ行。完了タブでも高さを揃える。
+  Widget _buildGoalsFiltersArea({required List<String> categoryFilterOptions}) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: _goalsSegmentHeight,
+          child: SegmentedButton<_GoalsView>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: _GoalsView.active,
+                label: Text(l10n.goalsViewActive),
+              ),
+              ButtonSegment(
+                value: _GoalsView.completed,
+                label: Text(l10n.goalsViewCompleted),
+              ),
+            ],
+            selected: {_goalsView},
+            onSelectionChanged: (selected) {
+              setState(() {
+                _goalsView = selected.first;
+                if (_goalsView == _GoalsView.completed) {
+                  _selectedCategoryFilter = null;
+                }
+              });
+            },
+            style: SegmentedButton.styleFrom(
+              selectedBackgroundColor: AppColors.secondary,
+              selectedForegroundColor: AppColors.primaryTextOnLight,
+              backgroundColor: AppColors.surfaceLow,
+              foregroundColor: AppColors.onSurfaceAlpha(0.85),
+              side: BorderSide(
+                color: AppColors.outlineVariant.withValues(alpha: 0.5),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              minimumSize: const Size(0, _goalsSegmentHeight),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.standard,
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          )
-        : null;
-
-    if (isReorderable && filteredItems.isNotEmpty) {
-      return SliverMainAxisGroup(
-        slivers: [
-          SliverReorderableList(
-            itemCount: filteredItems.length,
-            onReorder: (oldIndex, newIndex) {
-              if (oldIndex < newIndex) newIndex--;
-              final newOrder = List<Item>.from(filteredItems);
-              final item = newOrder.removeAt(oldIndex);
-              newOrder.insert(newIndex, item);
-              context.read<ItemRepository>().updateItemsOrder(
-                newOrder.map((i) => i.id).toList(),
-              );
-            },
-            itemBuilder: (context, index) {
-              final item = filteredItems[index];
-              return ReorderableDragStartListener(
-                index: index,
-                key: ValueKey(item.id),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Stack(
-                    children: [
-                      _ItemCard(item: item),
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.22),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.12),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 36,
+          child: categoryFilterOptions.isEmpty
+              ? const SizedBox.shrink()
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ...categoryFilterOptions.map((cat) {
+                          final label = cat.isEmpty ? l10n.categoryUnset : cat;
+                          final selected = _selectedCategoryFilter == cat;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(label),
+                              selected: selected,
+                              onSelected: (_) => setState(
+                                () => _selectedCategoryFilter = selected
+                                    ? null
+                                    : cat,
+                              ),
+                              selectedColor: AppColors.secondary.withValues(
+                                alpha: 0.35,
+                              ),
+                              backgroundColor: AppColors.surfaceLow,
+                              side: BorderSide(
+                                color: AppColors.outlineVariant.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                              checkmarkColor: AppColors.secondary,
+                              labelStyle: TextStyle(
+                                color: selected
+                                    ? AppColors.onSurfaceAlpha(1)
+                                    : AppColors.onSurfaceAlpha(0.8),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              visualDensity: VisualDensity.compact,
                             ),
-                          ),
-                          child: Icon(
-                            Icons.drag_indicator,
-                            size: 16,
-                            color: AppColors.onSurfaceAlpha(0.7),
-                          ),
-                        ),
-                      ),
-                    ],
+                          );
+                        }),
+                      ],
+                    ),
                   ),
                 ),
-              );
-            },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompletedGoalsSliver(List<VaultItem> completed) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverMainAxisGroup(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildGoalsFiltersArea(categoryFilterOptions: const []),
+            ),
           ),
-          ?completedLink,
+          if (completed.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 64,
+                      color: AppColors.onSurfaceAlpha(0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      AppLocalizations.of(context)!.noCompletedGoalsYet,
+                      style: TextStyle(
+                        color: AppColors.onSurfaceAlpha(0.5),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return _CompletedGoalCard(item: completed[index]);
+              }, childCount: completed.length),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildItemListSliver({
+    required List<VaultItem> filteredItems,
+    required bool isReorderable,
+  }) {
+    if (isReorderable && filteredItems.isNotEmpty) {
+      return SliverReorderableList(
+        itemCount: filteredItems.length,
+        onReorder: (oldIndex, newIndex) {
+          if (oldIndex < newIndex) newIndex--;
+          final newOrder = List<VaultItem>.from(filteredItems);
+          final item = newOrder.removeAt(oldIndex);
+          newOrder.insert(newIndex, item);
+          context.read<ItemRepository>().updateItemsOrder(
+            newOrder.map((i) => i.id).toList(),
+          );
+        },
+        itemBuilder: (context, index) {
+          final item = filteredItems[index];
+          return _ItemCard(
+            key: ValueKey(item.id),
+            item: item,
+            overlayTopRight: _ItemCardTopActions(
+              item: item,
+              listReorderIndex: index,
+            ),
+          );
+        },
       );
     }
 
-    return SliverMainAxisGroup(
-      slivers: [
-        SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
-            if (index < filteredItems.length) {
-              return _ItemCard(item: filteredItems[index]);
-            }
-            return const SizedBox.shrink();
-          }, childCount: filteredItems.length),
-        ),
-        ?completedLink,
-      ],
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final item = filteredItems[index];
+        return _ItemCard(
+          item: item,
+          overlayTopRight: _ItemCardTopActions(item: item),
+        );
+      }, childCount: filteredItems.length),
     );
   }
 }
@@ -473,70 +461,47 @@ class _HomeScreenState extends State<HomeScreen> {
 class _NetWorthHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Item>>(
+    return StreamBuilder<List<VaultItem>>(
       stream: context.read<ItemRepository>().watchAllItems(),
       builder: (context, itemsSnapshot) {
         if (!itemsSnapshot.hasData) {
-          return SizedBox(
-            height: 160,
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: _NetWorthSkeleton(),
           );
         }
         return FutureBuilder<({String baseCurrency, AggregationResult result})>(
           future: _loadData(context, itemsSnapshot.data!),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return _NetWorthSkeleton(
-                isLoading: snapshot.connectionState == ConnectionState.waiting,
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                child: const _NetWorthSkeleton(),
               );
             }
             final base = snapshot.data!.baseCurrency;
             final r = snapshot.data!.result;
+            final l10n = AppLocalizations.of(context)!;
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(24),
-              decoration: AppColors.glassCard(radius: 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              padding: const EdgeInsets.all(16),
+              decoration: AppColors.glassCard(radius: 24),
+              child: Row(
                 children: [
-                  Text(
-                    'Available Net Worth',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurfaceVariant,
-                      letterSpacing: 1.1,
+                  Expanded(
+                    child: _SubStat(
+                      label: l10n.totalSavings,
+                      value: formatCurrencyByCode(r.totalSavings, base),
+                      accentColor: AppColors.success,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    formatCurrencyByCode(r.netWorth, base),
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontSize: 42,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      letterSpacing: -1,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _SubStat(
+                      label: l10n.totalDebt,
+                      value: formatCurrencyByCode(r.totalDebt, base),
+                      accentColor: AppColors.error,
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _SubStat(
-                        label: 'Total Savings',
-                        value: formatCurrencyByCode(r.totalSavings, base),
-                        color: AppColors.success,
-                      ),
-                      const SizedBox(width: 24),
-                      _SubStat(
-                        label: 'Total Debt',
-                        value: formatCurrencyByCode(r.totalDebt, base),
-                        color: AppColors.error,
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -549,7 +514,7 @@ class _NetWorthHeader extends StatelessWidget {
 
   Future<({String baseCurrency, AggregationResult result})> _loadData(
     BuildContext context,
-    List<Item> items,
+    List<VaultItem> items,
   ) async {
     final settings = context.read<SettingsStore>();
     final agg = context.read<AggregationService>();
@@ -560,82 +525,57 @@ class _NetWorthHeader extends StatelessWidget {
   }
 }
 
-/// 純資産ヘッダー用のスケルトン（金額取得中）
+/// 貯めたお金 / 借りたお金 サマリー用スケルトン
 class _NetWorthSkeleton extends StatelessWidget {
-  const _NetWorthSkeleton({required this.isLoading});
-
-  final bool isLoading;
+  const _NetWorthSkeleton();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.onSurfaceAlpha(0.06)),
       ),
-      child: Stack(
+      child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: AppColors.onSurfaceAlpha(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: 160,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.onSurfaceAlpha(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: AppColors.onSurfaceAlpha(0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  Container(
-                    width: 56,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: AppColors.onSurfaceAlpha(0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if (isLoading)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2,
-                ),
-              ),
+          Expanded(child: _skeletonStatBox()),
+          const SizedBox(width: 12),
+          Expanded(child: _skeletonStatBox()),
+        ],
+      ),
+    );
+  }
+
+  Widget _skeletonStatBox() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 56,
+            height: 12,
+            decoration: BoxDecoration(
+              color: AppColors.onSurfaceAlpha(0.12),
+              borderRadius: BorderRadius.circular(4),
             ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: 88,
+            height: 22,
+            decoration: BoxDecoration(
+              color: AppColors.onSurfaceAlpha(0.18),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
         ],
       ),
     );
@@ -646,36 +586,47 @@ class _SubStat extends StatelessWidget {
   const _SubStat({
     required this.label,
     required this.value,
-    required this.color,
+    required this.accentColor,
   });
 
   final String label;
   final String value;
-  final Color color;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surface.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label.toUpperCase(),
-            style: TextStyle(fontSize: 10, color: color, letterSpacing: 0.8),
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: accentColor,
+              height: 1.2,
+            ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontFamily: 'Manrope',
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
               color: AppColors.primary,
+              letterSpacing: -0.3,
+              height: 1.1,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -683,45 +634,10 @@ class _SubStat extends StatelessWidget {
   }
 }
 
-class _BottomNavIcon extends StatelessWidget {
-  const _BottomNavIcon({required this.icon, this.active = false, this.onTap});
+class _CompletedGoalCard extends StatelessWidget {
+  const _CompletedGoalCard({required this.item});
 
-  final IconData icon;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final child = active
-        ? Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Icon(icon, color: AppColors.primaryTextOnLight, size: 20),
-          )
-        : Icon(icon, color: AppColors.onSurfaceAlpha(0.65), size: 22);
-
-    if (onTap == null) return child;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Padding(padding: const EdgeInsets.all(6), child: child),
-      ),
-    );
-  }
-}
-
-/// アイテムカード用のスケルトン（金額取得中）
-class _ItemCardSkeleton extends StatelessWidget {
-  const _ItemCardSkeleton({required this.item, required this.onTap});
-
-  final Item item;
-  final VoidCallback onTap;
+  final VaultItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -730,79 +646,235 @@ class _ItemCardSkeleton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
+          ),
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            height: 100,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.onSurfaceAlpha(0.06),
-                width: 1,
-              ),
+              border: Border.all(color: AppColors.onSurfaceAlpha(0.06)),
             ),
-            child: Stack(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: AppColors.onSurfaceAlpha(0.08),
-                        borderRadius: const BorderRadius.horizontal(
-                          left: Radius.circular(16),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              item.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.onSurfaceAlpha(1),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: itemImageRefIsDisplayable(item.imagePath)
+                        ? ItemCoverImage(
+                            imageRef: item.imagePath!,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            color: AppColors.success.withValues(alpha: 0.2),
+                            child: Icon(
+                              Icons.check_circle,
+                              size: 28,
+                              color: AppColors.onSurfaceAlpha(0.7),
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: AppColors.onSurfaceAlpha(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: 72,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: AppColors.onSurfaceAlpha(0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Icon(
-                        Icons.chevron_right,
-                        color: AppColors.onSurfaceAlpha(0.4),
-                      ),
-                    ),
-                  ],
+                          ),
+                  ),
                 ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurfaceAlpha(1),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        AppLocalizations.of(context)!.purchasedFor(
+                          formatCurrencyByCode(
+                            item.targetAmount,
+                            item.currency,
+                          ),
+                        ),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.onSurfaceAlpha(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.onSurfaceAlpha(0.4)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// カード右上: 編集（常時）と、並び替えリスト内ではドラッグハンドル
+class _ItemCardTopActions extends StatelessWidget {
+  const _ItemCardTopActions({required this.item, this.listReorderIndex});
+
+  final VaultItem item;
+  final int? listReorderIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final edit = Tooltip(
+      message: '編集',
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AddItemScreen(editItem: item)),
+            );
+          },
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: AppColors.onSurfaceAlpha(0.9),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final dragHandle = Material(
+      type: MaterialType.transparency,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 10, 8),
+        child: Icon(
+          Icons.drag_indicator,
+          size: 22,
+          color: AppColors.onSurfaceAlpha(0.85),
+        ),
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          edit,
+          if (listReorderIndex != null)
+            ReorderableDragStartListener(
+              index: listReorderIndex!,
+              child: dragHandle,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// アイテムカード用のスケルトン（金額取得中）
+class _ItemCardSkeleton extends StatelessWidget {
+  const _ItemCardSkeleton({
+    required this.item,
+    required this.onTap,
+    this.overlayTopRight,
+  });
+
+  final VaultItem item;
+  final VoidCallback onTap;
+  final Widget? overlayTopRight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 100,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.onSurfaceAlpha(0.06), width: 1),
+          ),
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: AppColors.onSurfaceAlpha(0.08),
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(16),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.onSurfaceAlpha(1),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: AppColors.onSurfaceAlpha(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: 72,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: AppColors.onSurfaceAlpha(0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: AppColors.onSurfaceAlpha(0.4),
+                    ),
+                  ),
+                ],
+              ),
+              if (overlayTopRight == null)
                 Positioned(
                   top: 12,
                   right: 12,
@@ -815,8 +887,9 @@ class _ItemCardSkeleton extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
+              if (overlayTopRight != null)
+                Positioned(top: 10, right: 10, child: overlayTopRight!),
+            ],
           ),
         ),
       ),
@@ -825,9 +898,10 @@ class _ItemCardSkeleton extends StatelessWidget {
 }
 
 class _ItemCard extends StatelessWidget {
-  const _ItemCard({required this.item});
+  const _ItemCard({super.key, required this.item, this.overlayTopRight});
 
-  final Item item;
+  final VaultItem item;
+  final Widget? overlayTopRight;
 
   @override
   Widget build(BuildContext context) {
@@ -835,11 +909,15 @@ class _ItemCard extends StatelessWidget {
       future: context.read<TransactionRepository>().getCurrentAmount(item.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _ItemCardSkeleton(
-            item: item,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _ItemCardSkeleton(
+              item: item,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
+              ),
+              overlayTopRight: overlayTopRight,
             ),
           );
         }
@@ -871,6 +949,7 @@ class _ItemCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   child: Stack(
                     fit: StackFit.expand,
+                    clipBehavior: Clip.none,
                     children: [
                       if (itemImageRefIsDisplayable(item.imagePath))
                         ItemCoverImage(
@@ -942,6 +1021,8 @@ class _ItemCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (overlayTopRight != null)
+                        Positioned(top: 10, right: 10, child: overlayTopRight!),
                     ],
                   ),
                 ),

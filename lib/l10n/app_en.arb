@@ -1,0 +1,78 @@
+{
+  "@@locale": "en",
+  "goalsSectionTitle": "Goals",
+  "totalSavings": "Saved",
+  "totalDebt": "Owed",
+  "goalsViewActive": "Active",
+  "goalsViewCompleted": "Completed",
+  "categoryUnset": "Uncategorized",
+  "exchangeRateFetchFailed": "Failed to fetch exchange rates",
+  "emptyGoalsPrompt": "Add an item to start saving",
+  "addItem": "Add item",
+  "noCompletedGoalsYet": "No completed goals yet",
+  "purchasedFor": "Purchased for {amount}",
+  "@purchasedFor": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "editItem": "Edit item",
+  "save": "Save",
+  "imageSaveFailed": "Failed to save image",
+  "titleAndTargetRequired": "Please enter a title and target amount",
+  "convertToRepayingFailed": "Could not switch to repaying (only available while saving)",
+  "deleteItemTitle": "Delete item",
+  "deleteItemConfirm": "Delete \"{title}\"? Transaction history will also be deleted.",
+  "@deleteItemConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "delete": "Delete",
+  "itemDeleted": "Item deleted",
+  "removePhoto": "Remove photo",
+  "addPhotoOptional": "Add photo (optional)",
+  "fieldTitle": "Title",
+  "fieldTargetAmount": "Target amount",
+  "purchasedOnCreditTitle": "Already purchased (record as debt)",
+  "purchasedOnCreditSubtitleNew": "Record as an advance for the full target amount",
+  "purchasedOnCreditSubtitleEdit": "On save, record as an advance for the target amount you enter",
+  "fieldCurrency": "Currency",
+  "fieldCategoryOptional": "Category (optional)",
+  "fieldTargetDateOptional": "Target date (optional)",
+  "targetDateUnset": "Not set",
+  "clear": "Clear",
+  "deleteThisItem": "Delete this item",
+  "settingsTitle": "Settings",
+  "settingsLanguage": "Language",
+  "languageSystem": "System default",
+  "languageJapanese": "Japanese",
+  "languageEnglish": "English",
+  "settingsBaseCurrency": "Base currency",
+  "settingsNotifications": "Notifications",
+  "settingsNotificationsWebUnavailable": "Local notifications are not available on the web version.",
+  "settingsNotifTiming": "Notification timing",
+  "settingsNotifMonthly": "Monthly",
+  "settingsNotifWeekly": "Weekly",
+  "settingsNotifOff": "Off",
+  "settingsNotifWhichDay": "Which day of the month?",
+  "settingsNotifMonthlyDay": "Day {day} of each month",
+  "@settingsNotifMonthlyDay": {
+    "placeholders": {
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsNotifWhichWeekday": "Which day of the week?",
+  "settingsNotifTime": "Notification time",
+  "settingsNotifApply": "Save notifications",
+  "settingsNotifDisabledSnack": "Notifications turned off",
+  "settingsNotifEnabledSnack": "Notifications saved",
+  "notifBodyDaily": "Log today's deposit",
+  "notifBodyWeekly": "Log this week's deposit"
+}

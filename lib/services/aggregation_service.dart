@@ -1,4 +1,5 @@
-import '../database/app_database.dart';
+import '../models/item_status.dart';
+import '../models/vault_item.dart';
 import '../repositories/transaction_repository.dart';
 import 'exchange_rate_service.dart';
 
@@ -22,7 +23,7 @@ class AggregationService {
   final TransactionRepository _txRepo;
 
   Future<AggregationResult> computeWithBaseCurrency(
-    List<Item> items,
+    List<VaultItem> items,
     String baseCurrency,
     ExchangeRateService exchange,
   ) async {
@@ -63,7 +64,7 @@ class AggregationService {
     );
   }
 
-  Future<AggregationResult> compute(List<Item> items) async {
+  Future<AggregationResult> compute(List<VaultItem> items) async {
     double totalSavings = 0;
     double totalDebt = 0;
     final itemsWithAmounts = <String, double>{};
@@ -108,8 +109,8 @@ class AggregationService {
     required DateTime now,
   }) {
     if (currentAmount >= targetAmount) return null;
-    final positiveDeposits =
-        deposits.where((d) => d.amount > 0).toList()..sort((a, b) => a.date.compareTo(b.date));
+    final positiveDeposits = deposits.where((d) => d.amount > 0).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
     if (positiveDeposits.isEmpty) return null;
 
     const maxRecent = 10;
