@@ -13,6 +13,7 @@ VaultItem vaultItemFromRow(Item row) {
     category: row.category,
     status: row.status,
     sortOrder: row.sortOrder,
+    isPinned: row.isPinned,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   );

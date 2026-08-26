@@ -261,8 +261,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                                 onPressed: _clearImage,
                                 icon: const Icon(Icons.close, size: 20),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.black54,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: AppColors.scrim
+                                      .withValues(alpha: 0.72),
+                                  foregroundColor: AppColors.onScrim,
                                   padding: const EdgeInsets.all(6),
                                   minimumSize: const Size(36, 36),
                                 ),
@@ -277,12 +278,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.black54,
+                                    color: AppColors.scrim
+                                        .withValues(alpha: 0.72),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     Icons.edit,
-                                    color: AppColors.onSurfaceAlpha(1),
+                                    color: AppColors.onSurface,
                                     size: 20,
                                   ),
                                 ),
@@ -297,13 +299,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
                           Icon(
                             Icons.add_photo_alternate_outlined,
                             size: 48,
-                            color: AppColors.onSurfaceAlpha(0.4),
+                            color: AppColors.onSurfaceVariant,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             l10n.addPhotoOptional,
                             style: TextStyle(
-                              color: AppColors.onSurfaceAlpha(0.5),
+                              color: AppColors.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -315,7 +317,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
             TextField(
               controller: _titleController,
               style: TextStyle(
-                color: AppColors.onSurfaceAlpha(1),
+                color: AppColors.onSurface,
                 fontSize: 16,
               ),
               decoration: InputDecoration(labelText: l10n.fieldTitle),
@@ -332,13 +334,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
                 ),
               ],
               style: TextStyle(
-                color: AppColors.onSurfaceAlpha(1),
+                color: AppColors.onSurface,
                 fontSize: 16,
               ),
               decoration: InputDecoration(
                 labelText: l10n.fieldTargetAmount,
                 suffixText: _currency,
-                suffixStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.6)),
+                suffixStyle: TextStyle(color: AppColors.onSurfaceVariant),
               ),
             ),
             if (widget.editItem == null ||
@@ -349,7 +351,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
                 title: Text(
                   l10n.purchasedOnCreditTitle,
                   style: TextStyle(
-                    color: AppColors.onSurfaceAlpha(1),
+                    color: AppColors.onSurface,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -359,7 +361,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
                       ? l10n.purchasedOnCreditSubtitleNew
                       : l10n.purchasedOnCreditSubtitleEdit,
                   style: TextStyle(
-                    color: AppColors.onSurfaceAlpha(0.55),
+                    color: AppColors.onSurfaceVariant,
                     fontSize: 13,
                   ),
                 ),
@@ -372,7 +374,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
               key: ValueKey(_currency),
               initialValue: _currency,
               dropdownColor: AppColors.surface,
-              style: TextStyle(color: AppColors.onSurfaceAlpha(1)),
+              style: TextStyle(color: AppColors.onSurface),
               decoration: InputDecoration(labelText: l10n.fieldCurrency),
               items: _currencies
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -383,7 +385,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
             TextField(
               controller: _categoryController,
               style: TextStyle(
-                color: AppColors.onSurfaceAlpha(1),
+                color: AppColors.onSurface,
                 fontSize: 16,
               ),
               decoration: InputDecoration(labelText: l10n.fieldCategoryOptional),
@@ -420,8 +422,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
                             : l10n.targetDateUnset,
                         style: TextStyle(
                           color: _targetDate != null
-                              ? AppColors.onSurfaceAlpha(1)
-                              : AppColors.onSurfaceAlpha(0.5),
+                              ? AppColors.onSurface
+                              : AppColors.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -453,7 +455,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
                   icon: Icon(
                     Icons.delete_outline,
                     size: 18,
-                    color: AppColors.onSurfaceAlpha(0.5),
+                    color: AppColors.onSurfaceVariant,
                   ),
                   label: Text(
                     l10n.deleteThisItem,

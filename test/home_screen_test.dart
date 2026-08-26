@@ -1,55 +1,173 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:target_vault/models/item_status.dart';
+import 'package:target_vault/models/vault_item.dart';
 import 'package:target_vault/screens/home_screen.dart';
+import 'package:target_vault/widgets/vault_hero_card.dart';
+import 'package:target_vault/widgets/vault_tile.dart';
 
 import 'support/in_memory_backend.dart';
 import 'support/test_app.dart';
 import 'support/test_widget_providers.dart';
 
+VaultItem _item({
+  required String id,
+  required String title,
+  double target = 10000,
+  DateTime? targetDate,
+  String? category,
+  bool isPinned = false,
+  int sortOrder = 0,
+}) {
+  final now = DateTime(2026, 1, 1);
+  return VaultItem(
+    id: id,
+    title: title,
+    targetAmount: target,
+    currency: 'JPY',
+    targetDate: targetDate,
+    category: category,
+    status: ItemStatus.saving,
+    sortOrder: sortOrder,
+    isPinned: isPinned,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+Future<void> _pumpHome(WidgetTester tester, ItemTxTestBackend backend) async {
+  await tester.pumpWidget(
+    testMaterialApp(
+      home: MultiProvider(
+        providers: testWidgetProviders(backend),
+        child: const HomeScreen(),
+      ),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 void main() {
-  testWidgets('HomeScreen shows title and items section', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('貯金箱が0件ならオンボーディングを出す', (tester) async {
     final backend = ItemTxTestBackend();
     addTearDown(backend.dispose);
-    await tester.pumpWidget(
-      testMaterialApp(
-        home: MultiProvider(
-          providers: testWidgetProviders(backend),
-          child: const HomeScreen(),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('TARGET VAULT'), findsOneWidget);
-    expect(find.text('Goals'), findsOneWidget);
-    expect(find.text('進行中'), findsOneWidget);
-    expect(find.text('完了'), findsOneWidget);
-    expect(find.text('利用可能純資産'), findsNothing);
-    expect(find.byIcon(Icons.person), findsNothing);
+    await _pumpHome(tester, backend);
 
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('貯めたお金'), findsOneWidget);
-    expect(find.text('借りたお金'), findsOneWidget);
+    expect(find.text('はじめる'), findsOneWidget);
+    expect(find.text('欲しいものへ、こつこつ貯金'), findsOneWidget);
+    // 合計や純資産は出さない
+    expect(find.text('貯めたお金'), findsNothing);
+    expect(find.text('借りたお金'), findsNothing);
   });
 
-  testWidgets('HomeScreen shows settings button', (WidgetTester tester) async {
+  testWidgets('貯金箱があれば主役カードとアプリ名を出す', (tester) async {
     final backend = ItemTxTestBackend();
     addTearDown(backend.dispose);
-    await tester.pumpWidget(
-      testMaterialApp(
-        home: MultiProvider(
-          providers: testWidgetProviders(backend),
-          child: const HomeScreen(),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    backend.items.add(_item(id: 'a', title: 'MacBook'));
 
-    expect(find.byIcon(Icons.settings), findsOneWidget);
+    await _pumpHome(tester, backend);
+
+    expect(find.text('Target Vault'), findsOneWidget);
+    expect(find.byType(VaultHeroCard), findsOneWidget);
+    expect(find.text('MacBook'), findsOneWidget);
+    expect(find.text('貯金する'), findsOneWidget);
+    // 1件だけならタイルは出ない
+    expect(find.byType(VaultTile), findsNothing);
+  });
+
+  testWidgets('残高から「あといくら」を出す', (tester) async {
+    final backend = ItemTxTestBackend();
+    addTearDown(backend.dispose);
+    backend.items.add(_item(id: 'a', title: 'カメラ', target: 10000));
+    await FakeTransactionRepository(
+      backend,
+    ).addTransaction(itemId: 'a', amount: 3000);
+
+    await _pumpHome(tester, backend);
+
+    expect(find.textContaining('あと'), findsWidgets);
+    expect(find.textContaining('7,000'), findsWidgets);
+  });
+
+  testWidgets('主役以外はタイルに並ぶ', (tester) async {
+    final backend = ItemTxTestBackend();
+    addTearDown(backend.dispose);
+    backend.items.addAll([
+      _item(
+        id: 'a',
+        title: '近いほう',
+        targetDate: DateTime(2026, 3, 1),
+        sortOrder: 0,
+      ),
+      _item(
+        id: 'b',
+        title: '遠いほう',
+        targetDate: DateTime(2027, 3, 1),
+        sortOrder: 1,
+      ),
+    ]);
+
+    await _pumpHome(tester, backend);
+
+    // 目標日が近いほうが主役
+    expect(find.byType(VaultHeroCard), findsOneWidget);
+    expect(find.byType(VaultTile), findsOneWidget);
+    expect(find.text('ほかの貯金箱'), findsOneWidget);
+  });
+
+  testWidgets('ピン留めが自動選定より優先される', (tester) async {
+    final backend = ItemTxTestBackend();
+    addTearDown(backend.dispose);
+    backend.items.addAll([
+      _item(
+        id: 'a',
+        title: '目標日が近い',
+        targetDate: DateTime(2026, 3, 1),
+        sortOrder: 0,
+      ),
+      _item(id: 'b', title: 'ピン留め', isPinned: true, sortOrder: 1),
+    ]);
+
+    await _pumpHome(tester, backend);
+
+    final hero = tester.widget<VaultHeroCard>(find.byType(VaultHeroCard));
+    expect(hero.snapshot.item.title, 'ピン留め');
+  });
+
+  testWidgets('設定と完了への導線がある', (tester) async {
+    final backend = ItemTxTestBackend();
+    addTearDown(backend.dispose);
+    backend.items.add(_item(id: 'a', title: 'MacBook'));
+
+    await _pumpHome(tester, backend);
+
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
+  });
+
+  testWidgets('カテゴリフィルタでタイルを絞り込む', (tester) async {
+    final backend = ItemTxTestBackend();
+    addTearDown(backend.dispose);
+    backend.items.addAll([
+      _item(
+        id: 'a',
+        title: '主役',
+        targetDate: DateTime(2026, 3, 1),
+        sortOrder: 0,
+      ),
+      _item(id: 'b', title: '家電', category: '家電', sortOrder: 1),
+      _item(id: 'c', title: '旅行', category: '旅行', sortOrder: 2),
+    ]);
+
+    await _pumpHome(tester, backend);
+    expect(find.byType(VaultTile), findsNWidgets(2));
+
+    await tester.tap(find.widgetWithText(FilterChip, '家電'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(VaultTile), findsOneWidget);
   });
 }

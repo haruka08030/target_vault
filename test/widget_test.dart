@@ -7,7 +7,9 @@ import 'support/test_app.dart';
 import 'support/test_widget_providers.dart';
 
 void main() {
-  testWidgets('App launches and shows Target Vault', (WidgetTester tester) async {
+  testWidgets('App launches and shows the onboarding start action', (
+    WidgetTester tester,
+  ) async {
     final backend = ItemTxTestBackend();
     addTearDown(backend.dispose);
     await tester.pumpWidget(
@@ -21,6 +23,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('TARGET VAULT'), findsOneWidget);
+    // 貯金箱が0件のときは、説明を並べず「はじめる」だけを出す。
+    expect(find.text('はじめる'), findsOneWidget);
   });
 }

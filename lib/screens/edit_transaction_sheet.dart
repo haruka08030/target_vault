@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/vault_transaction.dart';
 import '../repositories/transaction_repository.dart';
 import '../theme/app_colors.dart';
@@ -64,7 +65,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
             colorScheme: ColorScheme.dark(
               primary: AppColors.primary,
               surface: AppColors.surface,
-              onSurface: AppColors.onSurfaceAlpha(1),
+              onSurface: AppColors.onSurface,
             ),
           ),
           child: child!,
@@ -88,8 +89,8 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
     final parsed = double.tryParse(text);
     if (parsed == null || parsed <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正しい金額を入力してください'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.invalidAmount),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -133,7 +134,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.onSurfaceAlpha(0.3),
+                color: AppColors.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -144,7 +145,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppColors.onSurfaceAlpha(1),
+              color: AppColors.onSurface,
             ),
           ),
           const SizedBox(height: 20),
@@ -170,10 +171,10 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
                 if (states.contains(WidgetState.selected)) {
                   return AppColors.primary.withValues(alpha: 0.3);
                 }
-                return AppColors.onSurfaceAlpha(0.08);
+                return AppColors.outlineVariant;
               }),
               foregroundColor: WidgetStateProperty.all(
-                AppColors.onSurfaceAlpha(1),
+                AppColors.onSurface,
               ),
             ),
           ),
@@ -190,15 +191,15 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w600,
-              color: AppColors.onSurfaceAlpha(1),
+              color: AppColors.onSurface,
             ),
             decoration: InputDecoration(
               hintText: '0',
-              hintStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.3)),
+              hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
               suffixText: _currencySuffix(widget.currency),
               suffixStyle: TextStyle(
                 fontSize: 16,
-                color: AppColors.onSurfaceAlpha(0.6),
+                color: AppColors.onSurfaceVariant,
               ),
               filled: true,
               fillColor: AppColors.background,
@@ -242,7 +243,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
             controller: _noteController,
             decoration: InputDecoration(
               hintText: 'メモ（任意）',
-              hintStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.3)),
+              hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
               filled: true,
               fillColor: AppColors.background,
               border: OutlineInputBorder(
@@ -273,7 +274,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
                     height: 24,
                     width: 24,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: AppColors.onPrimary,
                       strokeWidth: 2,
                     ),
                   )

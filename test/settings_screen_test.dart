@@ -45,7 +45,8 @@ void main() {
 
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Language'), findsOneWidget);
-    expect(find.text('Base currency'), findsOneWidget);
+    // 合計の換算をやめたので「ベース通貨」ではなく「新規作成時の初期値」。
+    expect(find.text('Default currency'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('言語'), findsNothing);
   });

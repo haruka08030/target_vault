@@ -103,6 +103,21 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
+  );
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -136,6 +151,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     category,
     status,
     sortOrder,
+    isPinned,
     createdAt,
     updatedAt,
   ];
@@ -205,6 +221,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
       );
     }
+    if (data.containsKey('is_pinned')) {
+      context.handle(
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -268,6 +290,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
       )!,
+      isPinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_pinned'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -298,6 +324,9 @@ class Item extends DataClass implements Insertable<Item> {
   final String? category;
   final ItemStatus status;
   final int sortOrder;
+
+  /// ホームの主役カードに固定するアイテム。固定は最大1件。
+  final bool isPinned;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Item({
@@ -310,6 +339,7 @@ class Item extends DataClass implements Insertable<Item> {
     this.category,
     required this.status,
     required this.sortOrder,
+    required this.isPinned,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -335,6 +365,7 @@ class Item extends DataClass implements Insertable<Item> {
       );
     }
     map['sort_order'] = Variable<int>(sortOrder);
+    map['is_pinned'] = Variable<bool>(isPinned);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -357,6 +388,7 @@ class Item extends DataClass implements Insertable<Item> {
           : Value(category),
       status: Value(status),
       sortOrder: Value(sortOrder),
+      isPinned: Value(isPinned),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -377,6 +409,7 @@ class Item extends DataClass implements Insertable<Item> {
       category: serializer.fromJson<String?>(json['category']),
       status: serializer.fromJson<ItemStatus>(json['status']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -394,6 +427,7 @@ class Item extends DataClass implements Insertable<Item> {
       'category': serializer.toJson<String?>(category),
       'status': serializer.toJson<ItemStatus>(status),
       'sortOrder': serializer.toJson<int>(sortOrder),
+      'isPinned': serializer.toJson<bool>(isPinned),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -409,6 +443,7 @@ class Item extends DataClass implements Insertable<Item> {
     Value<String?> category = const Value.absent(),
     ItemStatus? status,
     int? sortOrder,
+    bool? isPinned,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Item(
@@ -421,6 +456,7 @@ class Item extends DataClass implements Insertable<Item> {
     category: category.present ? category.value : this.category,
     status: status ?? this.status,
     sortOrder: sortOrder ?? this.sortOrder,
+    isPinned: isPinned ?? this.isPinned,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -439,6 +475,7 @@ class Item extends DataClass implements Insertable<Item> {
       category: data.category.present ? data.category.value : this.category,
       status: data.status.present ? data.status.value : this.status,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -456,6 +493,7 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('category: $category, ')
           ..write('status: $status, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('isPinned: $isPinned, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -473,6 +511,7 @@ class Item extends DataClass implements Insertable<Item> {
     category,
     status,
     sortOrder,
+    isPinned,
     createdAt,
     updatedAt,
   );
@@ -489,6 +528,7 @@ class Item extends DataClass implements Insertable<Item> {
           other.category == this.category &&
           other.status == this.status &&
           other.sortOrder == this.sortOrder &&
+          other.isPinned == this.isPinned &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -503,6 +543,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<String?> category;
   final Value<ItemStatus> status;
   final Value<int> sortOrder;
+  final Value<bool> isPinned;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -516,6 +557,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.category = const Value.absent(),
     this.status = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.isPinned = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -530,6 +572,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.category = const Value.absent(),
     required ItemStatus status,
     this.sortOrder = const Value.absent(),
+    this.isPinned = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -549,6 +592,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<String>? category,
     Expression<String>? status,
     Expression<int>? sortOrder,
+    Expression<bool>? isPinned,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -563,6 +607,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (category != null) 'category': category,
       if (status != null) 'status': status,
       if (sortOrder != null) 'sort_order': sortOrder,
+      if (isPinned != null) 'is_pinned': isPinned,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -579,6 +624,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<String?>? category,
     Value<ItemStatus>? status,
     Value<int>? sortOrder,
+    Value<bool>? isPinned,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -593,6 +639,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       category: category ?? this.category,
       status: status ?? this.status,
       sortOrder: sortOrder ?? this.sortOrder,
+      isPinned: isPinned ?? this.isPinned,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -631,6 +678,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -655,6 +705,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('category: $category, ')
           ..write('status: $status, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('isPinned: $isPinned, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -1370,6 +1421,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<String?> category,
       required ItemStatus status,
       Value<int> sortOrder,
+      Value<bool> isPinned,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -1385,6 +1437,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<String?> category,
       Value<ItemStatus> status,
       Value<int> sortOrder,
+      Value<bool> isPinned,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -1464,6 +1517,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1557,6 +1615,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -1607,6 +1670,9 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1677,6 +1743,7 @@ class $$ItemsTableTableManager
                 Value<String?> category = const Value.absent(),
                 Value<ItemStatus> status = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -1690,6 +1757,7 @@ class $$ItemsTableTableManager
                 category: category,
                 status: status,
                 sortOrder: sortOrder,
+                isPinned: isPinned,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1705,6 +1773,7 @@ class $$ItemsTableTableManager
                 Value<String?> category = const Value.absent(),
                 required ItemStatus status,
                 Value<int> sortOrder = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -1718,6 +1787,7 @@ class $$ItemsTableTableManager
                 category: category,
                 status: status,
                 sortOrder: sortOrder,
+                isPinned: isPinned,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

@@ -123,6 +123,27 @@ class ItemTxTestBackend {
   final _uuid = const Uuid();
   final _itemsCtrl = StreamController<List<VaultItem>>.broadcast();
   final _txCtrls = <String, StreamController<List<VaultTransaction>>>{};
+  final _balancesCtrl = StreamController<Map<String, double>>.broadcast();
+
+  Map<String, double> get balances => {
+    for (final e in txsByItem.entries)
+      if (e.value.isNotEmpty)
+        e.key: e.value.fold<double>(0, (s, t) => s + t.amount),
+  };
+
+  void _emitBalances() {
+    if (!_balancesCtrl.isClosed) {
+      _balancesCtrl.add(balances);
+    }
+  }
+
+  Stream<Map<String, double>> watchBalances() {
+    return Stream<Map<String, double>>.multi((emitter) {
+      emitter.add(balances);
+      final sub = _balancesCtrl.stream.listen(emitter.add);
+      emitter.onCancel = sub.cancel;
+    });
+  }
 
   void _emitItems() {
     if (!_itemsCtrl.isClosed) {
@@ -135,6 +156,7 @@ class ItemTxTestBackend {
     if (c != null && !c.isClosed) {
       c.add(List.unmodifiable(txsByItem[itemId] ?? const []));
     }
+    _emitBalances();
   }
 
   Stream<List<VaultItem>> watchItems() {
@@ -159,6 +181,7 @@ class ItemTxTestBackend {
 
   void dispose() {
     _itemsCtrl.close();
+    _balancesCtrl.close();
     for (final c in _txCtrls.values) {
       c.close();
     }
@@ -331,6 +354,19 @@ class FakeItemRepository implements ItemRepository {
   }
 
   @override
+  Future<void> setPinned(String id, bool pinned) async {
+    for (var i = 0; i < _b.items.length; i++) {
+      final item = _b.items[i];
+      if (item.id == id) {
+        _b.items[i] = item.copyWith(isPinned: pinned);
+      } else if (pinned && item.isPinned) {
+        _b.items[i] = item.copyWith(isPinned: false);
+      }
+    }
+    _b._emitItems();
+  }
+
+  @override
   Future<void> updateItemsOrder(List<String> orderedIds) async {
     final now = DateTime.now().toUtc();
     for (var i = 0; i < orderedIds.length; i++) {
@@ -347,6 +383,7 @@ class FakeItemRepository implements ItemRepository {
         category: old.category,
         status: old.status,
         sortOrder: i,
+        isPinned: old.isPinned,
         createdAt: old.createdAt,
         updatedAt: now,
       );
@@ -369,6 +406,9 @@ class FakeTransactionRepository implements TransactionRepository {
     final list = _b.txsByItem[itemId] ?? const [];
     return list.fold<double>(0, (s, t) => s + t.amount);
   }
+
+  @override
+  Stream<Map<String, double>> watchAllBalances() => _b.watchBalances();
 
   @override
   Future<void> addTransaction({

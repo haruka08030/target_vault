@@ -421,6 +421,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Log this week\'s deposit'**
   String get notifBodyWeekly;
+
+  /// No description provided for @onboardingTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Save up for what you want'**
+  String get onboardingTagline;
+
+  /// No description provided for @onboardingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Make a jar for each thing you want, and watch it fill up.'**
+  String get onboardingBody;
+
+  /// No description provided for @onboardingStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Let\'s start'**
+  String get onboardingStart;
+
+  /// No description provided for @homeHeroRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} to go'**
+  String homeHeroRemaining(String amount);
+
+  /// No description provided for @homeHeroReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to buy'**
+  String get homeHeroReached;
+
+  /// No description provided for @homeHeroRepaying.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} left to pay back'**
+  String homeHeroRepaying(String amount);
+
+  /// No description provided for @homeHeroOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {target}'**
+  String homeHeroOf(String current, String target);
+
+  /// No description provided for @homeHeroDueInDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days left'**
+  String homeHeroDueInDays(int days);
+
+  /// No description provided for @homeHeroDueToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Due today'**
+  String get homeHeroDueToday;
+
+  /// No description provided for @homeHeroOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days past'**
+  String homeHeroOverdue(int days);
+
+  /// No description provided for @homeHeroNoDate.
+  ///
+  /// In en, this message translates to:
+  /// **'No target date'**
+  String get homeHeroNoDate;
+
+  /// No description provided for @homeHeroPredicted.
+  ///
+  /// In en, this message translates to:
+  /// **'On track for {date}'**
+  String homeHeroPredicted(String date);
+
+  /// No description provided for @homeHeroPredictedLate.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days behind'**
+  String homeHeroPredictedLate(int days);
+
+  /// No description provided for @homeAddMoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Add money'**
+  String get homeAddMoney;
+
+  /// No description provided for @homeOtherVaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Your other jars'**
+  String get homeOtherVaults;
+
+  /// No description provided for @homeAllVaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Your jars'**
+  String get homeAllVaults;
+
+  /// No description provided for @homeViewCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed jars'**
+  String get homeViewCompleted;
+
+  /// No description provided for @homeSwipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe to see other jars'**
+  String get homeSwipeHint;
+
+  /// No description provided for @pinToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to home'**
+  String get pinToHome;
+
+  /// No description provided for @pinnedToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned to home'**
+  String get pinnedToHome;
+
+  /// No description provided for @unpinnedFromHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned'**
+  String get unpinnedFromHome;
+
+  /// No description provided for @emptyVaultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No jars yet'**
+  String get emptyVaultsTitle;
+
+  /// No description provided for @notifPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are turned off. Allow them in Settings to get reminders.'**
+  String get notifPermissionDenied;
+
+  /// No description provided for @notifScheduleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not set the reminder. Please try again.'**
+  String get notifScheduleFailed;
+
+  /// No description provided for @openSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings'**
+  String get openSettings;
+
+  /// No description provided for @settingsDefaultCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Default currency'**
+  String get settingsDefaultCurrency;
+
+  /// No description provided for @settingsDefaultCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Used when you create a new jar'**
+  String get settingsDefaultCurrencyHint;
+
+  /// No description provided for @notifBodyMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Time to add to your jars'**
+  String get notifBodyMonthly;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @detailPurchaseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as bought'**
+  String get detailPurchaseTitle;
+
+  /// No description provided for @detailPurchaseConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark this item as bought?'**
+  String get detailPurchaseConfirm;
+
+  /// No description provided for @detailPurchaseDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get detailPurchaseDone;
+
+  /// No description provided for @detailBuyOnCreditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy on credit'**
+  String get detailBuyOnCreditTitle;
+
+  /// No description provided for @detailBuyOnCreditConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not reached the target yet. Buy it now and record the remaining {amount} to pay back?'**
+  String detailBuyOnCreditConfirm(String amount);
+
+  /// No description provided for @detailBuyOnCreditConfirmLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get detailBuyOnCreditConfirmLabel;
+
+  /// No description provided for @detailPurchasedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Bought!'**
+  String get detailPurchasedSnack;
+
+  /// No description provided for @detailOnCreditSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded as bought on credit ({amount} to pay back)'**
+  String detailOnCreditSnack(String amount);
+
+  /// No description provided for @detailBuyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get detailBuyAction;
+
+  /// No description provided for @detailRepayingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paying back: record your repayments here'**
+  String get detailRepayingHint;
+
+  /// No description provided for @detailHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get detailHistoryTitle;
+
+  /// No description provided for @detailRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get detailRecord;
+
+  /// No description provided for @detailTargetDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Target date'**
+  String get detailTargetDate;
+
+  /// No description provided for @detailPredictedDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Predicted'**
+  String get detailPredictedDate;
+
+  /// No description provided for @detailDaysLate.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days behind schedule'**
+  String detailDaysLate(int days);
+
+  /// No description provided for @detailNoTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'No money in or out yet'**
+  String get detailNoTransactions;
+
+  /// No description provided for @invalidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid amount'**
+  String get invalidAmount;
+
+  /// No description provided for @deleteTransactionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this record?'**
+  String get deleteTransactionConfirm;
 }
 
 class _AppLocalizationsDelegate

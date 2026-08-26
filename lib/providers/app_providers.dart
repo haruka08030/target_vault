@@ -6,8 +6,6 @@ import '../database/app_database.dart';
 import '../database/settings_store.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
-import '../services/aggregation_service.dart';
-import '../services/exchange_rate_service.dart';
 import '../services/notification_service.dart';
 
 List<SingleChildWidget> appProviders({AppDatabase? database}) {
@@ -35,12 +33,6 @@ List<SingleChildWidget> appProviders({AppDatabase? database}) {
         controller.initialize();
         return controller;
       },
-    ),
-    ProxyProvider<SettingsStore, ExchangeRateService>(
-      update: (_, settings, _) => ExchangeRateService(settings),
-    ),
-    ProxyProvider<TransactionRepository, AggregationService>(
-      update: (_, tx, _) => AggregationService(tx),
     ),
     Provider<NotificationService>(create: (_) => NotificationService()),
   ];

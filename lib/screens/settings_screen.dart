@@ -28,8 +28,11 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   static const _currencies = ['JPY', 'USD', 'EUR', 'GBP', 'CHF'];
+  static const _localeCodes = ['system', 'ja', 'en'];
 
-  String? _baseCurrency;
+  /// 新しい貯金箱をつくるときの初期通貨。合算・換算はしない。
+  String? _defaultCurrency;
+
   /// Dropdown value: `system`, `ja`, `en`
   String _localeCode = 'system';
   int? _notifDay;
@@ -57,19 +60,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final wd = await s.getNotificationWeekday();
     final h = await s.getNotificationHour();
     final m = await s.getNotificationMinute();
-    if (mounted) {
-      setState(() {
-        _baseCurrency = base;
-        _localeCode = localeCode ?? 'system';
-        _notifDay = day;
-        _notifWeekday = wd;
-        _notifHour = h;
-        _notifMinute = m;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _defaultCurrency = base;
+      _localeCode = localeCode ?? 'system';
+      _notifDay = day;
+      _notifWeekday = wd;
+      _notifHour = h;
+      _notifMinute = m;
+    });
   }
 
-  Future<void> _applyNotifications(AppLocalizations l10n) async {
+  /// 設定を保存し、通知を組み直す。結果は呼び出し側がユーザーに伝える。
+  Future<NotificationResult> _applyNotifications(AppLocalizations l10n) async {
     final s = context.read<SettingsStore>();
     final notif = context.read<NotificationService>();
     await notif.cancelAll();
@@ -78,18 +81,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await s.setNotificationDay(_notifDay);
       await s.setNotificationWeekday(null);
       await s.setNotificationTime(_notifHour, _notifMinute);
-      await notif.scheduleDaily(
+      return notif.scheduleMonthly(
         id: 1,
         title: 'Target Vault',
-        body: l10n.notifBodyDaily,
+        body: l10n.notifBodyMonthly,
+        day: _notifDay!,
         hour: _notifHour,
         minute: _notifMinute,
       );
-    } else if (_notifWeekday != null) {
+    }
+
+    if (_notifWeekday != null) {
       await s.setNotificationDay(null);
       await s.setNotificationWeekday(_notifWeekday);
       await s.setNotificationTime(_notifHour, _notifMinute);
-      await notif.scheduleWeekly(
+      return notif.scheduleWeekly(
         id: 1,
         title: 'Target Vault',
         body: l10n.notifBodyWeekly,
@@ -97,16 +103,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
         hour: _notifHour,
         minute: _notifMinute,
       );
-    } else {
-      await s.setNotificationDay(null);
-      await s.setNotificationWeekday(null);
     }
+
+    await s.setNotificationDay(null);
+    await s.setNotificationWeekday(null);
+    return NotificationResult.scheduled;
   }
 
-  TextStyle _sectionLabelStyle() =>
-      TextStyle(fontSize: 14, color: AppColors.onSurfaceAlpha(0.6));
+  Future<void> _onApplyPressed(AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final wasOff = _notifDay == null && _notifWeekday == null;
+    final result = await _applyNotifications(l10n);
+    if (!mounted) return;
 
-  static const _localeCodes = ['system', 'ja', 'en'];
+    // 失敗を黙って飲み込むと「設定した」のに通知が来ない状態になる。
+    // 必ず結果を伝え、次に取れる行動を示す。
+    final String message;
+    SnackBarAction? action;
+    switch (result) {
+      case NotificationResult.scheduled:
+      case NotificationResult.unsupported:
+        message = wasOff
+            ? l10n.settingsNotifDisabledSnack
+            : l10n.settingsNotifEnabledSnack;
+      case NotificationResult.permissionDenied:
+        message = l10n.notifPermissionDenied;
+        action = SnackBarAction(
+          label: l10n.retry,
+          onPressed: () async {
+            await context.read<NotificationService>().requestPermissions();
+            if (mounted) await _onApplyPressed(l10n);
+          },
+        );
+      case NotificationResult.failed:
+        message = l10n.notifScheduleFailed;
+        action = SnackBarAction(
+          label: l10n.retry,
+          onPressed: () => _onApplyPressed(l10n),
+        );
+    }
+
+    messenger.showSnackBar(SnackBar(content: Text(message), action: action));
+  }
 
   /// Dart [DateTime.weekday]: 1=Mon .. 7=Sun
   String _weekdayLabel(BuildContext context, int weekday) {
@@ -131,370 +169,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back, color: AppColors.onSurfaceAlpha(0.9)),
-        ),
-        title: Text(
-          l10n.settingsTitle,
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w700,
-            fontFamily: 'Manrope',
-          ),
-        ),
-      ),
-      body: _baseCurrency == null
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
+      body: _defaultCurrency == null
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(l10n.settingsLanguage, style: _sectionLabelStyle()),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey(_localeCode),
-                    initialValue: _localeCode,
-                    dropdownColor: AppColors.surface,
-                    style: TextStyle(color: AppColors.onSurfaceAlpha(1)),
-                    decoration: InputDecoration(
-                      fillColor: AppColors.surfaceLow,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    items: _localeCodes
-                        .map(
-                          (code) => DropdownMenuItem(
-                            value: code,
-                            child: Text(_languageLabel(l10n, code)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) async {
-                      if (v == null) return;
-                      await context.read<AppLocaleController>().setLocaleCode(
-                        v,
-                      );
-                      if (!mounted) return;
-                      setState(() => _localeCode = v);
-                    },
-                  ),
-                  const SizedBox(height: 32),
-                  Text(l10n.settingsBaseCurrency, style: _sectionLabelStyle()),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey(_baseCurrency),
-                    initialValue: _baseCurrency,
-                    dropdownColor: AppColors.surface,
-                    style: TextStyle(color: AppColors.onSurfaceAlpha(1)),
-                    decoration: InputDecoration(
-                      fillColor: AppColors.surfaceLow,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    items: _currencies
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (v) async {
-                      if (v == null) return;
-                      final s = context.read<SettingsStore>();
-                      await s.setBaseCurrency(v);
-                      if (!mounted) return;
-                      setState(() => _baseCurrency = v);
-                    },
-                  ),
-                  const SizedBox(height: 32),
-                  Text(l10n.settingsNotifications, style: _sectionLabelStyle()),
-                  const SizedBox(height: 8),
-                  if (kIsWeb) ...[
-                    Text(
-                      l10n.settingsNotificationsWebUnavailable,
-                      style: TextStyle(
-                        color: AppColors.onSurfaceAlpha(0.65),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Opacity(
-                    opacity: kIsWeb ? 0.45 : 1,
-                    child: IgnorePointer(
-                      ignoring: kIsWeb,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: AppColors.elevatedCard(radius: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              l10n.settingsNotifTiming,
-                              style: TextStyle(
-                                color: AppColors.onSurfaceAlpha(0.9),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                  _Section(
+                    title: l10n.settingsLanguage,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey(_localeCode),
+                      initialValue: _localeCode,
+                      isExpanded: true,
+                      items: _localeCodes
+                          .map(
+                            (code) => DropdownMenuItem(
+                              value: code,
+                              child: Text(
+                                _languageLabel(l10n, code),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            SegmentedButton<int?>(
-                              segments: [
-                                ButtonSegment<int?>(
-                                  value: 1,
-                                  label: Text(l10n.settingsNotifMonthly),
-                                  icon: const Icon(
-                                    Icons.calendar_today,
-                                    size: 18,
-                                  ),
-                                ),
-                                ButtonSegment<int?>(
-                                  value: 2,
-                                  label: Text(l10n.settingsNotifWeekly),
-                                  icon: const Icon(Icons.date_range, size: 18),
-                                ),
-                                ButtonSegment<int?>(
-                                  value: null,
-                                  label: Text(l10n.settingsNotifOff),
-                                  icon: const Icon(
-                                    Icons.notifications_off_outlined,
-                                    size: 18,
-                                  ),
-                                ),
-                              ],
-                              selected: {_notifMode.value},
-                              onSelectionChanged: (Set<int?> v) {
-                                final mode = v.firstOrNull;
-                                setState(() {
-                                  switch (mode) {
-                                    case 1:
-                                      _notifDay = _notifDay ?? 1;
-                                      _notifWeekday = null;
-                                      break;
-                                    case 2:
-                                      _notifWeekday =
-                                          _notifWeekday ?? DateTime.monday;
-                                      _notifDay = null;
-                                      break;
-                                    default:
-                                      _notifDay = null;
-                                      _notifWeekday = null;
-                                  }
-                                });
-                              },
-                              style: ButtonStyle(
-                                backgroundColor:
-                                    WidgetStateProperty.resolveWith((states) {
-                                      if (states.contains(
-                                        WidgetState.selected,
-                                      )) {
-                                        return AppColors.primary.withValues(
-                                          alpha: 0.25,
-                                        );
-                                      }
-                                      return AppColors.background;
-                                    }),
-                                foregroundColor:
-                                    WidgetStateProperty.resolveWith((states) {
-                                      return states.contains(
-                                            WidgetState.selected,
-                                          )
-                                          ? AppColors.primaryLight
-                                          : AppColors.onSurfaceAlpha(0.7);
-                                    }),
-                                side: WidgetStateProperty.resolveWith((states) {
-                                  return BorderSide(
-                                    color: states.contains(WidgetState.selected)
-                                        ? AppColors.primary.withValues(
-                                            alpha: 0.5,
-                                          )
-                                        : AppColors.onSurfaceAlpha(0.12),
-                                  );
-                                }),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // 毎月○日: 日付ドロップダウン
-                            if (_notifDay != null) ...[
+                          )
+                          .toList(),
+                      onChanged: (v) async {
+                        if (v == null) return;
+                        await context.read<AppLocaleController>().setLocaleCode(
+                          v,
+                        );
+                        if (!mounted) return;
+                        setState(() => _localeCode = v);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _Section(
+                    title: l10n.settingsDefaultCurrency,
+                    hint: l10n.settingsDefaultCurrencyHint,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey(_defaultCurrency),
+                      initialValue: _defaultCurrency,
+                      isExpanded: true,
+                      items: _currencies
+                          .map(
+                            (c) => DropdownMenuItem(value: c, child: Text(c)),
+                          )
+                          .toList(),
+                      onChanged: (v) async {
+                        if (v == null) return;
+                        await context.read<SettingsStore>().setBaseCurrency(v);
+                        if (!mounted) return;
+                        setState(() => _defaultCurrency = v);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _Section(
+                    title: l10n.settingsNotifications,
+                    hint: kIsWeb
+                        ? l10n.settingsNotificationsWebUnavailable
+                        : null,
+                    child: Opacity(
+                      opacity: kIsWeb ? 0.45 : 1,
+                      child: IgnorePointer(
+                        ignoring: kIsWeb,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: AppColors.elevatedCard(radius: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
                               Text(
-                                l10n.settingsNotifWhichDay,
-                                style: TextStyle(
-                                  color: AppColors.onSurfaceAlpha(0.7),
-                                  fontSize: 13,
+                                l10n.settingsNotifTiming,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.onSurface,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<int>(
-                                key: ValueKey(_notifDay),
-                                initialValue: _notifDay,
-                                dropdownColor: AppColors.surface,
-                                decoration: InputDecoration(
-                                  fillColor: AppColors.background,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                style: TextStyle(
-                                  color: AppColors.onSurfaceAlpha(1),
-                                  fontSize: 15,
-                                ),
-                                items: List.generate(31, (i) {
-                                  final d = i + 1;
-                                  return DropdownMenuItem(
-                                    value: d,
-                                    child: Text(l10n.settingsNotifMonthlyDay(d)),
-                                  );
-                                }),
-                                onChanged: (v) {
-                                  if (v != null) setState(() => _notifDay = v);
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                            // 毎週○曜日: 曜日チップ（1行）
-                            if (_notifWeekday != null) ...[
-                              Text(
-                                l10n.settingsNotifWhichWeekday,
-                                style: TextStyle(
-                                  color: AppColors.onSurfaceAlpha(0.7),
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: List.generate(7, (i) {
-                                    final wd = i + 1;
-                                    final selected = _notifWeekday == wd;
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: FilterChip(
-                                        label: Text(_weekdayLabel(context, wd)),
-                                        selected: selected,
-                                        onSelected: (_) {
-                                          setState(() => _notifWeekday = wd);
-                                        },
-                                        selectedColor: AppColors.primary
-                                            .withValues(alpha: 0.3),
-                                        checkmarkColor: AppColors.primary,
-                                        backgroundColor: AppColors.background,
-                                        side: BorderSide(
-                                          color: selected
-                                              ? AppColors.primary.withValues(
-                                                  alpha: 0.6,
-                                                )
-                                              : AppColors.onSurfaceAlpha(0.12),
-                                        ),
+                              const SizedBox(height: 12),
+                              _timingSelector(l10n),
+                              if (_notifDay != null) ...[
+                                const SizedBox(height: 16),
+                                _FieldLabel(l10n.settingsNotifWhichDay),
+                                const SizedBox(height: 8),
+                                DropdownButtonFormField<int>(
+                                  key: ValueKey(_notifDay),
+                                  initialValue: _notifDay,
+                                  isExpanded: true,
+                                  items: List.generate(31, (i) {
+                                    final d = i + 1;
+                                    return DropdownMenuItem(
+                                      value: d,
+                                      child: Text(
+                                        l10n.settingsNotifMonthlyDay(d),
                                       ),
                                     );
                                   }),
+                                  onChanged: (v) {
+                                    if (v != null) {
+                                      setState(() => _notifDay = v);
+                                    }
+                                  },
                                 ),
+                              ],
+                              if (_notifWeekday != null) ...[
+                                const SizedBox(height: 16),
+                                _FieldLabel(l10n.settingsNotifWhichWeekday),
+                                const SizedBox(height: 8),
+                                _weekdayChips(),
+                              ],
+                              if (_notifMode != _NotifMode.off) ...[
+                                const SizedBox(height: 16),
+                                _FieldLabel(l10n.settingsNotifTime),
+                                const SizedBox(height: 8),
+                                _timeField(),
+                              ],
+                              const SizedBox(height: 20),
+                              FilledButton(
+                                onPressed: () => _onApplyPressed(l10n),
+                                child: Text(l10n.settingsNotifApply),
                               ),
-                              const SizedBox(height: 16),
                             ],
-                            // 時刻（毎月/毎週どちらか選択時のみ強調）
-                            if (_notifDay != null || _notifWeekday != null) ...[
-                              Text(
-                                l10n.settingsNotifTime,
-                                style: TextStyle(
-                                  color: AppColors.onSurfaceAlpha(0.7),
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              InkWell(
-                                onTap: () async {
-                                  final time = await showTimePicker(
-                                    context: context,
-                                    initialTime: TimeOfDay(
-                                      hour: _notifHour.clamp(0, 23),
-                                      minute: _notifMinute.clamp(0, 59),
-                                    ),
-                                  );
-                                  if (time != null && mounted) {
-                                    setState(() {
-                                      _notifHour = time.hour;
-                                      _notifMinute = time.minute;
-                                    });
-                                  }
-                                },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceLow,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: AppColors.onSurfaceAlpha(0.08),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.schedule,
-                                        size: 20,
-                                        color: AppColors.onSurfaceAlpha(0.8),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        '${_notifHour.toString().padLeft(2, '0')}:${_notifMinute.toString().padLeft(2, '0')}',
-                                        style: TextStyle(
-                                          color: AppColors.onSurfaceAlpha(1),
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                            FilledButton(
-                              onPressed: () async {
-                                final messenger = ScaffoldMessenger.of(context);
-                                final wasOff =
-                                    _notifDay == null && _notifWeekday == null;
-                                await _applyNotifications(l10n);
-                                if (!mounted) return;
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      wasOff
-                                          ? l10n.settingsNotifDisabledSnack
-                                          : l10n.settingsNotifEnabledSnack,
-                                    ),
-                                    backgroundColor: AppColors.surface,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: AppColors.primaryTextOnLight,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: Text(l10n.settingsNotifApply),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -502,6 +302,166 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _timingSelector(AppLocalizations l10n) {
+    // 文字サイズが大きいと3択が横に収まらないため、必要なら横スクロールさせる。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final selector = _timingSegments(l10n);
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: selector,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _timingSegments(AppLocalizations l10n) {
+    return SegmentedButton<int?>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment<int?>(value: 1, label: Text(l10n.settingsNotifMonthly)),
+        ButtonSegment<int?>(value: 2, label: Text(l10n.settingsNotifWeekly)),
+        ButtonSegment<int?>(value: null, label: Text(l10n.settingsNotifOff)),
+      ],
+      selected: {_notifMode.value},
+      onSelectionChanged: (Set<int?> v) {
+        final mode = v.firstOrNull;
+        setState(() {
+          switch (mode) {
+            case 1:
+              _notifDay = _notifDay ?? 1;
+              _notifWeekday = null;
+            case 2:
+              _notifWeekday = _notifWeekday ?? DateTime.monday;
+              _notifDay = null;
+            default:
+              _notifDay = null;
+              _notifWeekday = null;
+          }
+        });
+      },
+      style: SegmentedButton.styleFrom(
+        backgroundColor: AppColors.surfaceLow,
+        foregroundColor: AppColors.onSurfaceVariant,
+        selectedBackgroundColor: AppColors.primary,
+        selectedForegroundColor: AppColors.onPrimary,
+        side: const BorderSide(color: AppColors.outline),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _weekdayChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(7, (i) {
+          final wd = i + 1;
+          final selected = _notifWeekday == wd;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(_weekdayLabel(context, wd)),
+              selected: selected,
+              showCheckmark: false,
+              onSelected: (_) => setState(() => _notifWeekday = wd),
+              side: BorderSide(
+                color: selected ? AppColors.primaryOutline : AppColors.outline,
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _timeField() {
+    final label =
+        '${_notifHour.toString().padLeft(2, '0')}:'
+        '${_notifMinute.toString().padLeft(2, '0')}';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final time = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay(
+              hour: _notifHour.clamp(0, 23),
+              minute: _notifMinute.clamp(0, 59),
+            ),
+          );
+          if (time == null || !mounted) return;
+          setState(() {
+            _notifHour = time.hour;
+            _notifMinute = time.minute;
+          });
+        },
+        icon: const Icon(Icons.schedule, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
+
+/// 見出し + 補足 + 中身。設定画面のセクションはすべてこの形にそろえる。
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.child, this.hint});
+
+  final String title;
+  final String? hint;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontFamily: 'Manrope',
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.onBackground,
+          ),
+        ),
+        if (hint != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            hint!,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: 10),
+        child,
+      ],
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
     );
   }
 }

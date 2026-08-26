@@ -4,8 +4,6 @@ import 'package:target_vault/app_locale_controller.dart';
 import 'package:target_vault/database/settings_store.dart';
 import 'package:target_vault/repositories/item_repository.dart';
 import 'package:target_vault/repositories/transaction_repository.dart';
-import 'package:target_vault/services/aggregation_service.dart';
-import 'package:target_vault/services/exchange_rate_service.dart';
 import 'package:target_vault/services/notification_service.dart';
 
 import 'in_memory_backend.dart';
@@ -24,12 +22,6 @@ List<SingleChildWidget> testWidgetProviders(ItemTxTestBackend backend) {
     ),
     Provider<ItemRepository>.value(value: items),
     Provider<TransactionRepository>.value(value: txs),
-    ProxyProvider<SettingsStore, ExchangeRateService>(
-      update: (_, s, prev) => ExchangeRateService(s),
-    ),
-    ProxyProvider<TransactionRepository, AggregationService>(
-      update: (_, t, prev) => AggregationService(t),
-    ),
     Provider<NotificationService>(create: (_) => NotificationService()),
   ];
 }

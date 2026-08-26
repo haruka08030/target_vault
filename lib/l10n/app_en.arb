@@ -74,5 +74,125 @@
   "settingsNotifDisabledSnack": "Notifications turned off",
   "settingsNotifEnabledSnack": "Notifications saved",
   "notifBodyDaily": "Log today's deposit",
-  "notifBodyWeekly": "Log this week's deposit"
+  "notifBodyWeekly": "Log this week's deposit",
+  "onboardingTagline": "Save up for what you want",
+  "onboardingBody": "Make a jar for each thing you want, and watch it fill up.",
+  "onboardingStart": "Let's start",
+  "homeHeroRemaining": "{amount} to go",
+  "@homeHeroRemaining": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "homeHeroReached": "Ready to buy",
+  "homeHeroRepaying": "{amount} left to pay back",
+  "@homeHeroRepaying": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "homeHeroOf": "{current} of {target}",
+  "@homeHeroOf": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "homeHeroDueInDays": "{days} days left",
+  "@homeHeroDueInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "homeHeroDueToday": "Due today",
+  "homeHeroOverdue": "{days} days past",
+  "@homeHeroOverdue": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "homeHeroNoDate": "No target date",
+  "homeHeroPredicted": "On track for {date}",
+  "@homeHeroPredicted": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "homeHeroPredictedLate": "{days} days behind",
+  "@homeHeroPredictedLate": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "homeAddMoney": "Add money",
+  "homeOtherVaults": "Your other jars",
+  "homeAllVaults": "Your jars",
+  "homeViewCompleted": "Completed jars",
+  "homeSwipeHint": "Swipe to see other jars",
+  "pinToHome": "Pin to home",
+  "pinnedToHome": "Pinned to home",
+  "unpinnedFromHome": "Unpinned",
+  "emptyVaultsTitle": "No jars yet",
+  "notifPermissionDenied": "Notifications are turned off. Allow them in Settings to get reminders.",
+  "notifScheduleFailed": "Could not set the reminder. Please try again.",
+  "openSettings": "Open Settings",
+  "settingsDefaultCurrency": "Default currency",
+  "settingsDefaultCurrencyHint": "Used when you create a new jar",
+  "notifBodyMonthly": "Time to add to your jars",
+  "retry": "Retry",
+  "detailPurchaseTitle": "Mark as bought",
+  "detailPurchaseConfirm": "Mark this item as bought?",
+  "detailPurchaseDone": "Done",
+  "detailBuyOnCreditTitle": "Buy on credit",
+  "detailBuyOnCreditConfirm": "You have not reached the target yet. Buy it now and record the remaining {amount} to pay back?",
+  "@detailBuyOnCreditConfirm": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "detailBuyOnCreditConfirmLabel": "Buy",
+  "detailPurchasedSnack": "Bought!",
+  "detailOnCreditSnack": "Recorded as bought on credit ({amount} to pay back)",
+  "@detailOnCreditSnack": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "detailBuyAction": "Buy",
+  "detailRepayingHint": "Paying back: record your repayments here",
+  "detailHistoryTitle": "History",
+  "detailRecord": "Record",
+  "detailTargetDate": "Target date",
+  "detailPredictedDate": "Predicted",
+  "detailDaysLate": "{days} days behind schedule",
+  "@detailDaysLate": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "detailNoTransactions": "No money in or out yet",
+  "invalidAmount": "Please enter a valid amount",
+  "deleteTransactionConfirm": "Delete this record?"
 }

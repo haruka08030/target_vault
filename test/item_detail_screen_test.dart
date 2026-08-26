@@ -6,6 +6,7 @@ import 'package:target_vault/models/vault_item.dart';
 import 'package:target_vault/screens/item_detail_screen.dart';
 
 import 'support/in_memory_backend.dart';
+import 'support/test_app.dart';
 import 'support/test_widget_providers.dart';
 
 Widget wrapWithProviders(Widget child) {
@@ -13,10 +14,8 @@ Widget wrapWithProviders(Widget child) {
   addTearDown(backend.dispose);
   return MultiProvider(
     providers: testWidgetProviders(backend),
-    child: MaterialApp(
-      theme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
-      home: child,
-    ),
+    // 画面がローカライズされたので、テストでも delegates が要る。
+    child: testMaterialApp(home: child),
   );
 }
 

@@ -175,4 +175,165 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get notifBodyWeekly => '今週の入金を記録しましょう';
+
+  @override
+  String get onboardingTagline => '欲しいものへ、こつこつ貯金';
+
+  @override
+  String get onboardingBody => '欲しいものごとに貯金箱をつくって、貯まっていくのを眺めましょう。';
+
+  @override
+  String get onboardingStart => 'はじめる';
+
+  @override
+  String homeHeroRemaining(String amount) {
+    return 'あと $amount';
+  }
+
+  @override
+  String get homeHeroReached => '買えます';
+
+  @override
+  String homeHeroRepaying(String amount) {
+    return '残り $amount を埋め戻し';
+  }
+
+  @override
+  String homeHeroOf(String current, String target) {
+    return '$target のうち $current';
+  }
+
+  @override
+  String homeHeroDueInDays(int days) {
+    return 'あと $days 日';
+  }
+
+  @override
+  String get homeHeroDueToday => '今日まで';
+
+  @override
+  String homeHeroOverdue(int days) {
+    return '$days 日すぎています';
+  }
+
+  @override
+  String get homeHeroNoDate => '目標日なし';
+
+  @override
+  String homeHeroPredicted(String date) {
+    return 'このペースで $date ごろ';
+  }
+
+  @override
+  String homeHeroPredictedLate(int days) {
+    return '目標日より $days 日おそい見込み';
+  }
+
+  @override
+  String get homeAddMoney => '貯金する';
+
+  @override
+  String get homeOtherVaults => 'ほかの貯金箱';
+
+  @override
+  String get homeAllVaults => '貯金箱';
+
+  @override
+  String get homeViewCompleted => '完了した貯金箱';
+
+  @override
+  String get homeSwipeHint => 'スワイプでほかの貯金箱へ';
+
+  @override
+  String get pinToHome => 'ホームに固定';
+
+  @override
+  String get pinnedToHome => 'ホームに固定しました';
+
+  @override
+  String get unpinnedFromHome => '固定を解除しました';
+
+  @override
+  String get emptyVaultsTitle => 'まだ貯金箱がありません';
+
+  @override
+  String get notifPermissionDenied => '通知がオフになっています。設定アプリで許可してください。';
+
+  @override
+  String get notifScheduleFailed => '通知を設定できませんでした。もう一度お試しください。';
+
+  @override
+  String get openSettings => '設定を開く';
+
+  @override
+  String get settingsDefaultCurrency => 'デフォルトの通貨';
+
+  @override
+  String get settingsDefaultCurrencyHint => '新しい貯金箱をつくるときの初期値です';
+
+  @override
+  String get notifBodyMonthly => '貯金箱にお金を入れましょう';
+
+  @override
+  String get retry => 'もう一度';
+
+  @override
+  String get detailPurchaseTitle => '購入完了';
+
+  @override
+  String get detailPurchaseConfirm => 'このアイテムを購入完了としてマークしますか？';
+
+  @override
+  String get detailPurchaseDone => '完了';
+
+  @override
+  String get detailBuyOnCreditTitle => '前借りで購入';
+
+  @override
+  String detailBuyOnCreditConfirm(String amount) {
+    return '目標額に達していません。前借りで購入し、残り $amount を埋め戻しとして記録しますか？';
+  }
+
+  @override
+  String get detailBuyOnCreditConfirmLabel => '購入する';
+
+  @override
+  String get detailPurchasedSnack => '購入完了！';
+
+  @override
+  String detailOnCreditSnack(String amount) {
+    return '前借りで購入しました（残り $amount を埋め戻し）';
+  }
+
+  @override
+  String get detailBuyAction => '購入する';
+
+  @override
+  String get detailRepayingHint => '埋め戻し中：入金を記録してください';
+
+  @override
+  String get detailHistoryTitle => '入出金履歴';
+
+  @override
+  String get detailRecord => '記録';
+
+  @override
+  String get detailTargetDate => '目標日';
+
+  @override
+  String get detailPredictedDate => '予測日';
+
+  @override
+  String detailDaysLate(int days) {
+    return '$days日おそい見込み';
+  }
+
+  @override
+  String get detailNoTransactions => 'まだ入出金がありません';
+
+  @override
+  String get invalidAmount => '正しい金額を入力してください';
+
+  @override
+  String get deleteTransactionConfirm => 'この入出金を削除しますか？';
 }

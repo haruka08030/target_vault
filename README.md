@@ -1,45 +1,65 @@
 # Target Vault
 
-「欲しいものへの貯金」と「購入後の回収」を一元管理する資産形成アプリ。
+欲しいものごとに「貯金箱」をつくって貯めるアプリ。
+開いたときに見えるのは資産の合計ではなく、
+**いま一番近い貯金箱に、あといくらで届くか**。
 
 ## 技術スタック
 
 - **フレームワーク**: Flutter（iOS / Android）
 - **永続化**: Drift + SQLite（端末ローカル）
-- **為替API**: Frankfurter API
 - **状態管理**: Provider
+- **外部通信**: なし（完全オフライン）
 
 Web ビルドは非対応です。
 
 ## セットアップ
 
 ```bash
-cd target_vault
 flutter pub get
-dart run build_runner build   # 初回または lib/database/app_database.dart 変更時
+dart run build_runner build   # 初回、または lib/database/app_database.dart 変更時
 flutter run
 ```
 
+`lib/l10n/*.arb` を変更したら `flutter gen-l10n` を実行してください。
+
 ## 主な機能
 
-- **ホーム画面**:
-  純資産・貯蓄・負債の一覧、アイテムカード（写真・進捗バー・残高）
-- **アイテム管理**: 追加・編集、写真（フォトライブラリ、任意）、目標日・カテゴリ。画像は端末内に保存
-- **購入ボタン**: 目標額達成時は完了、未達時は前借りとして Repaying に遷移
-- **入出金**: 2タップで入金登録（金額のみ、日付は自動）
-- **予測日**: 直近の入金ペースから算出、目標日とのギャップ表示
-- **多通貨**: アイテム単位で通貨指定、ホームはベース通貨で換算表示
-- **通知**: 設定画面で日付・曜日・時刻を指定
+- **ホーム**: 主役カード（いま一番近い貯金箱／あと◯◯円／「貯金する」）＋
+  ほかの貯金箱のタイル。左右スワイプで主役を切り替え
+- **ピン留め**: 詳細画面から、ホームの主役に固定（最大1件）
+- **貯金箱の管理**: 追加・編集、写真、目標日、カテゴリ。画像は端末内に保存
+- **購入**: 目標額に達していれば完了、未達なら前借りとして埋め戻しに移行
+- **入出金**: 金額のみで登録（日付は自動）。履歴の修正・削除も可能
+- **予測日**: 直近の入金ペースから算出し、目標日とのギャップを表示
+- **通貨**: 貯金箱ごとに指定。換算・合算はしない
+- **通知**: 毎月○日 / 毎週○曜日 / オフ
 
 ## プロジェクト構成
 
 ```
 lib/
-├── database/        # AppDatabase, SettingsStore（Drift）
-├── models/          # VaultItem, VaultTransaction, ItemStatus
-├── repositories/    # Item / Transaction（Drift）
-├── services/        # ExchangeRate, Notification, Aggregation
-├── screens/         # Home, ItemDetail, AddItem, Settings, QuickAdd
-├── providers/       # Provider 設定
-└── utils/           # format など
+├── database/     # AppDatabase, SettingsStore（Drift）
+├── models/       # VaultItem, VaultTransaction, ItemStatus
+├── repositories/ # Item / Transaction
+├── services/     # VaultSelection（主役の選定）, Notification, Aggregation（予測）
+├── screens/      # Home, ItemDetail, AddItem, Settings, QuickAdd, Onboarding
+├── widgets/      # VaultHeroCard, VaultTile, VaultIllustration
+├── theme/        # AppColors（色トークン）, AppTheme
+└── l10n/         # 日本語 / 英語
 ```
+
+## 設計の前提
+
+**機能を足す前に [docs/要件定義書.md](docs/要件定義書.md) の
+「やらないこと」を読んでください。** そこにあるものは意図的に外しています。
+判断の経緯は [docs/design_decisions.md](docs/design_decisions.md) にあります。
+
+## テスト
+
+```bash
+flutter test
+```
+
+`test/layout_resilience_test.dart` は、文字サイズ2.0倍・320pt幅で
+レイアウトが溢れないことを検証します。UI を変更したら必ず通してください。

@@ -11,6 +11,7 @@ class VaultItem {
     this.category,
     required this.status,
     required this.sortOrder,
+    this.isPinned = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -24,6 +25,9 @@ class VaultItem {
   final String? category;
   final ItemStatus status;
   final int sortOrder;
+
+  /// ホームの主役カードに固定されているか。固定は最大1件。
+  final bool isPinned;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -44,6 +48,7 @@ class VaultItem {
       category: json['category'] as String?,
       status: ItemStatus.fromDb(json['status'] as String),
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
+      isPinned: json['is_pinned'] == true || json['is_pinned'] == 1,
       createdAt: parseTs(json['created_at']) ?? DateTime.now(),
       updatedAt: parseTs(json['updated_at']) ?? DateTime.now(),
     );
@@ -59,6 +64,7 @@ class VaultItem {
     String? category,
     ItemStatus? status,
     int? sortOrder,
+    bool? isPinned,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -72,6 +78,7 @@ class VaultItem {
       category: category ?? this.category,
       status: status ?? this.status,
       sortOrder: sortOrder ?? this.sortOrder,
+      isPinned: isPinned ?? this.isPinned,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

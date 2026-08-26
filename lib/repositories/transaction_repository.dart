@@ -10,6 +10,12 @@ abstract class TransactionRepository {
 
   Future<double> getCurrentAmount(String itemId);
 
+  /// 全アイテムの残高をまとめて返す（itemId -> 残高）。
+  ///
+  /// カードごとに [getCurrentAmount] を呼ぶと N 件で N 回のクエリになるため、
+  /// 一覧表示ではこちらを使う。取引が無いアイテムはキーを持たない。
+  Stream<Map<String, double>> watchAllBalances();
+
   Future<void> addTransaction({
     required String itemId,
     required double amount,
@@ -46,10 +52,26 @@ class DriftTransactionRepository implements TransactionRepository {
 
   @override
   Future<double> getCurrentAmount(String itemId) async {
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) => t.itemId.equals(itemId)))
-        .get();
-    return rows.fold<double>(0, (s, t) => s + t.amount);
+    final sum = _db.transactions.amount.sum();
+    final query = _db.selectOnly(_db.transactions)
+      ..addColumns([sum])
+      ..where(_db.transactions.itemId.equals(itemId));
+    final row = await query.getSingleOrNull();
+    return row?.read(sum) ?? 0;
+  }
+
+  @override
+  Stream<Map<String, double>> watchAllBalances() {
+    final sum = _db.transactions.amount.sum();
+    final query = _db.selectOnly(_db.transactions)
+      ..addColumns([_db.transactions.itemId, sum])
+      ..groupBy([_db.transactions.itemId]);
+    return query.watch().map((rows) {
+      return {
+        for (final row in rows)
+          row.read(_db.transactions.itemId)!: row.read(sum) ?? 0.0,
+      };
+    });
   }
 
   @override

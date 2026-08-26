@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/item_status.dart';
 import '../models/vault_item.dart';
 import '../models/vault_transaction.dart';
@@ -49,23 +50,26 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final amount = await txRepo.getCurrentAmount(_item.id);
     if (!mounted) return;
 
+    final l10n = AppLocalizations.of(context)!;
     bool? confirmed;
     if (amount >= _item.targetAmount) {
       confirmed = await showAppConfirmDialog(
         context,
-        title: '購入完了',
-        content: const Text('このアイテムを購入完了としてマークしますか？'),
-        confirmLabel: '完了',
+        title: l10n.detailPurchaseTitle,
+        content: Text(l10n.detailPurchaseConfirm),
+        confirmLabel: l10n.detailPurchaseDone,
         confirmColor: AppColors.success,
       );
     } else {
       confirmed = await showAppConfirmDialog(
         context,
-        title: '前借りで購入',
+        title: l10n.detailBuyOnCreditTitle,
         content: Text(
-          '目標額に達していません。前借りで購入し、残り ${formatCurrencyByCode(_item.targetAmount - amount, _item.currency)} を返済として記録しますか？',
+          l10n.detailBuyOnCreditConfirm(
+            formatCurrencyByCode(_item.targetAmount - amount, _item.currency),
+          ),
         ),
-        confirmLabel: '購入する',
+        confirmLabel: l10n.detailBuyOnCreditConfirmLabel,
         confirmColor: AppColors.warning,
       );
     }
@@ -75,8 +79,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       await itemRepo.updateItemStatus(_item.id, ItemStatus.completed);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('購入完了！'),
+          SnackBar(
+            content: Text(l10n.detailPurchasedSnack),
             backgroundColor: AppColors.success,
           ),
         );
@@ -94,7 +98,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '前借り登録（残り ${formatCurrencyByCode(diff, _item.currency)} を返済）',
+              l10n.detailOnCreditSnack(
+                formatCurrencyByCode(diff, _item.currency),
+              ),
             ),
             backgroundColor: AppColors.warning,
           ),
@@ -105,11 +111,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   Future<void> _onDeleteItem() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showAppConfirmDialog(
       context,
-      title: 'アイテムを削除',
-      content: Text('「${_item.title}」を削除しますか？ 入出金履歴も一緒に削除されます。'),
-      confirmLabel: '削除',
+      title: l10n.deleteItemTitle,
+      content: Text(l10n.deleteItemConfirm(_item.title)),
+      confirmLabel: l10n.delete,
       isDestructive: true,
     );
     if (confirmed != true || !mounted) return;
@@ -118,42 +125,50 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     Navigator.pop(context);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('アイテムを削除しました')));
+    ).showSnackBar(SnackBar(content: Text(l10n.itemDeleted)));
+  }
+
+  /// ホームの主役カードに固定する / 解除する。固定は最大1件。
+  Future<void> _onTogglePinned() async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final next = !_item.isPinned;
+    await context.read<ItemRepository>().setPinned(_item.id, next);
+    if (!mounted) return;
+    setState(() => _item = _item.copyWith(isPinned: next));
+    messenger.showSnackBar(
+      SnackBar(content: Text(next ? l10n.pinnedToHome : l10n.unpinnedFromHome)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back, color: AppColors.onSurfaceAlpha(0.9)),
-        ),
-        title: Text(
-          _item.title,
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w700,
-            fontFamily: 'Manrope',
-          ),
-        ),
+        title: Text(_item.title),
         actions: [
+          IconButton(
+            onPressed: _onTogglePinned,
+            tooltip: l10n.pinToHome,
+            isSelected: _item.isPinned,
+            icon: const Icon(Icons.push_pin_outlined),
+            selectedIcon: const Icon(
+              Icons.push_pin,
+              color: AppColors.primaryOutline,
+            ),
+          ),
           IconButton(
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => AddItemScreen(editItem: _item)),
             ).then((_) => setState(() {})),
-            icon: Icon(
-              Icons.edit_outlined,
-              color: AppColors.onSurfaceAlpha(0.7),
-            ),
+            tooltip: l10n.editItem,
+            icon: const Icon(Icons.edit_outlined),
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: AppColors.onSurfaceAlpha(0.7)),
-            color: AppColors.surface,
+            icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               if (value == 'delete') _onDeleteItem();
             },
@@ -169,7 +184,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'アイテムを削除',
+                      l10n.deleteThisItem,
                       style: const TextStyle(color: AppColors.error),
                     ),
                   ],
@@ -226,8 +241,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
-                                  Colors.black.withValues(alpha: 0.18),
-                                  Colors.black.withValues(alpha: 0.7),
+                                  AppColors.scrim.withValues(alpha: 0.25),
+                                  AppColors.scrim.withValues(alpha: 0.82),
                                 ],
                               ),
                             ),
@@ -243,7 +258,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     child: Icon(
                       Icons.image_outlined,
                       size: 64,
-                      color: AppColors.onSurfaceAlpha(0.5),
+                      color: AppColors.onSurfaceVariant,
                     ),
                   ),
                 const SizedBox(height: 24),
@@ -258,7 +273,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             width: 140,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: AppColors.onSurfaceAlpha(0.15),
+                              color: AppColors.surfaceHigh,
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
@@ -266,7 +281,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             width: 100,
                             height: 18,
                             decoration: BoxDecoration(
-                              color: AppColors.onSurfaceAlpha(0.1),
+                              color: AppColors.surfaceHigh,
                               borderRadius: BorderRadius.circular(6),
                             ),
                           ),
@@ -289,30 +304,44 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   Container(
                     height: 10,
                     decoration: BoxDecoration(
-                      color: AppColors.onSurfaceAlpha(0.1),
+                      color: AppColors.surfaceHigh,
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                 ] else ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        formatCurrencyByCode(amount, _item.currency),
-                        style: TextStyle(
-                          fontSize: 38,
-                          fontWeight: FontWeight.w800,
-                          fontFamily: 'Manrope',
-                          color: isRepaying
-                              ? AppColors.errorLight
-                              : AppColors.success,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            formatCurrencyByCode(amount, _item.currency),
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w800,
+                              fontFamily: 'Manrope',
+                              color: isRepaying
+                                  ? AppColors.warning
+                                  : AppColors.success,
+                            ),
+                          ),
                         ),
                       ),
-                      Text(
-                        '/ ${formatCurrencyByCode(_item.targetAmount, _item.currency)}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: AppColors.onSurfaceAlpha(0.6),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '/ ${formatCurrencyByCode(_item.targetAmount, _item.currency)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: AppColors.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],
@@ -323,9 +352,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 10,
-                      backgroundColor: AppColors.onSurfaceAlpha(0.1),
+                      backgroundColor: AppColors.surfaceHigh,
                       valueColor: AlwaysStoppedAnimation(
-                        isRepaying ? AppColors.errorLight : AppColors.primary,
+                        isRepaying ? AppColors.warning : AppColors.primary,
                       ),
                     ),
                   ),
@@ -340,14 +369,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     onPressed: _onPurchase,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.primaryTextOnLight,
+                      foregroundColor: AppColors.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                     icon: const Icon(Icons.shopping_cart_checkout),
-                    label: const Text('購入する'),
+                    label: Text(l10n.detailBuyAction),
                   ),
                 ],
                 if (!isLoading && isRepaying) ...[
@@ -368,7 +397,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '前借り中：返済入金を記録してください',
+                            l10n.detailRepayingHint,
                             style: TextStyle(
                               color: AppColors.onSurfaceAlpha(0.9),
                               fontSize: 14,
@@ -383,34 +412,35 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '入出金履歴',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurfaceAlpha(0.9),
+                    Flexible(
+                      child: Text(
+                        l10n.detailHistoryTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurfaceAlpha(0.9),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: () => showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => QuickAddSheet(
-                          item: _item,
-                          onAdded: () => setState(() {}),
-                        ),
+                      onPressed: () => showQuickAddSheet(
+                        context,
+                        _item,
+                        onAdded: () => setState(() {}),
                       ),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.primaryTextOnLight,
+                        foregroundColor: AppColors.onPrimary,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
                         ),
                       ),
                       icon: const Icon(Icons.add, size: 20),
-                      label: const Text('記録'),
+                      label: Text(l10n.detailRecord),
                     ),
                   ],
                 ),
@@ -433,6 +463,7 @@ class _PredictionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return StreamBuilder<List<VaultTransaction>>(
       stream: context.read<TransactionRepository>().watchByItem(item.id),
       builder: (context, txSnapshot) {
@@ -456,7 +487,7 @@ class _PredictionSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.onSurfaceAlpha(0.06)),
+            border: Border.all(color: AppColors.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,18 +495,28 @@ class _PredictionSection extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '目標日',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.onSurfaceAlpha(0.6),
+                  Flexible(
+                    child: Text(
+                      l10n.detailTargetDate,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                  Text(
-                    dateFormat.format(targetDate),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.onSurfaceAlpha(1),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      dateFormat.format(targetDate),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onSurface,
+                      ),
                     ),
                   ),
                 ],
@@ -485,30 +526,40 @@ class _PredictionSection extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '予測日',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onSurfaceAlpha(0.6),
+                    Flexible(
+                      child: Text(
+                        l10n.detailPredictedDate,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.onSurfaceVariant,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isLate) ...[
                           Icon(
                             Icons.warning_amber_rounded,
                             size: 18,
-                            color: AppColors.errorLight,
+                            color: AppColors.warning,
                           ),
                           const SizedBox(width: 4),
                         ],
-                        Text(
-                          dateFormat.format(predicted),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isLate
-                                ? AppColors.errorLight
-                                : AppColors.onSurfaceAlpha(1),
+                        Flexible(
+                          child: Text(
+                            dateFormat.format(predicted),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isLate
+                                  ? AppColors.warning
+                                  : AppColors.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -518,10 +569,12 @@ class _PredictionSection extends StatelessWidget {
                 if (isLate) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${predicted.difference(targetDate).inDays}日遅れの見込み',
+                    l10n.detailDaysLate(
+                      predicted.difference(targetDate).inDays,
+                    ),
                     style: const TextStyle(
                       fontSize: 12,
-                      color: AppColors.errorLight,
+                      color: AppColors.warning,
                     ),
                   ),
                 ],
@@ -542,6 +595,7 @@ class _TransactionList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return StreamBuilder<List<VaultTransaction>>(
       stream: context.read<TransactionRepository>().watchByItem(itemId),
       builder: (context, snapshot) {
@@ -552,9 +606,9 @@ class _TransactionList extends StatelessWidget {
             decoration: AppColors.elevatedCard(radius: 16),
             child: Center(
               child: Text(
-                'まだ入出金がありません',
+                l10n.detailNoTransactions,
                 style: TextStyle(
-                  color: AppColors.onSurfaceAlpha(0.5),
+                  color: AppColors.onSurfaceVariant,
                   fontSize: 14,
                 ),
               ),
@@ -594,13 +648,13 @@ class _TransactionTile extends StatelessWidget {
           color: AppColors.error.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(Icons.delete, color: AppColors.onSurfaceAlpha(1)),
+        child: Icon(Icons.delete, color: AppColors.onSurface),
       ),
       confirmDismiss: (_) async {
         final result = await showAppConfirmDialog(
           context,
           title: '削除',
-          content: const Text('この入出金を削除しますか？'),
+          content: Text(AppLocalizations.of(context)!.deleteTransactionConfirm),
           confirmLabel: '削除',
           isDestructive: true,
         );
@@ -611,14 +665,22 @@ class _TransactionTile extends StatelessWidget {
           .deleteTransaction(transaction.id),
       child: InkWell(
         onTap: () {
+          // モーダルは Navigator 直下に作られるため、Provider を明示的に渡す。
+          final repo = context.read<TransactionRepository>();
           showModalBottomSheet<void>(
             context: context,
             backgroundColor: Colors.transparent,
             isScrollControlled: true,
-            builder: (ctx) => EditTransactionSheet(
-              transaction: transaction,
-              currency: currency,
-              onSaved: () {},
+            builder: (_) => InheritedTheme.captureAll(
+              context,
+              Provider<TransactionRepository>.value(
+                value: repo,
+                child: EditTransactionSheet(
+                  transaction: transaction,
+                  currency: currency,
+                  onSaved: () {},
+                ),
+              ),
             ),
           );
         },
@@ -630,34 +692,40 @@ class _TransactionTile extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dateFormat.format(transaction.date),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.onSurfaceAlpha(0.6),
-                    ),
-                  ),
-                  if (transaction.note != null && transaction.note!.isNotEmpty)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      transaction.note!,
+                      dateFormat.format(transaction.date),
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.onSurfaceAlpha(0.5),
+                        color: AppColors.onSurfaceVariant,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                ],
+                    if (transaction.note != null &&
+                        transaction.note!.isNotEmpty)
+                      Text(
+                        transaction.note!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               Text(
                 '${isDeposit ? '+' : ''}${formatCurrencyByCode(transaction.amount, currency)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: isDeposit ? AppColors.success : AppColors.errorLight,
+                  color: isDeposit ? AppColors.success : AppColors.error,
                 ),
               ),
             ],

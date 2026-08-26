@@ -3,11 +3,39 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/item_status.dart';
+import '../l10n/app_localizations.dart';
 import '../models/vault_item.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
 import '../theme/app_colors.dart';
 import '../utils/thousands_separator_input_formatter.dart';
+
+/// 入出金シートを開く。ホームと詳細で同じ出し方をするための入口。
+///
+/// モーダルは Navigator 直下に作られるため、そのままでは呼び出し元の
+/// Provider に届かない。`InheritedTheme`/`Provider` を明示的に引き継ぐ。
+Future<void> showQuickAddSheet(
+  BuildContext context,
+  VaultItem item, {
+  VoidCallback? onAdded,
+}) {
+  final sheet = QuickAddSheet(item: item, onAdded: onAdded ?? () {});
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => InheritedTheme.captureAll(
+      context,
+      Provider<TransactionRepository>.value(
+        value: context.read<TransactionRepository>(),
+        child: Provider<ItemRepository>.value(
+          value: context.read<ItemRepository>(),
+          child: sheet,
+        ),
+      ),
+    ),
+  );
+}
 
 class QuickAddSheet extends StatefulWidget {
   const QuickAddSheet({super.key, required this.item, required this.onAdded});
@@ -37,8 +65,8 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     final parsed = double.tryParse(text);
     if (parsed == null || parsed <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正しい金額を入力してください'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.invalidAmount),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -75,9 +103,9 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
         bottom: MediaQuery.of(context).padding.bottom + 24,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.96),
+        color: AppColors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -88,7 +116,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.onSurfaceAlpha(0.3),
+                color: AppColors.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -119,10 +147,10 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                       if (states.contains(WidgetState.selected)) {
                         return AppColors.primary.withValues(alpha: 0.3);
                       }
-                      return AppColors.onSurfaceAlpha(0.08);
+                      return AppColors.outlineVariant;
                     }),
                     foregroundColor: WidgetStateProperty.all(
-                      AppColors.onSurfaceAlpha(1),
+                      AppColors.onSurface,
                     ),
                   ),
                 ),
@@ -149,15 +177,15 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
               fontFamily: 'Manrope',
               fontSize: 40,
               fontWeight: FontWeight.w700,
-              color: AppColors.onSurfaceAlpha(1),
+              color: AppColors.onSurface,
             ),
             decoration: InputDecoration(
               hintText: '0',
-              hintStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.3)),
+              hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
               suffixText: _currencySuffix(widget.item.currency),
               suffixStyle: TextStyle(
                 fontSize: 18,
-                color: AppColors.onSurfaceAlpha(0.6),
+                color: AppColors.onSurfaceVariant,
               ),
               filled: true,
               fillColor: AppColors.surfaceLow,
@@ -173,7 +201,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
             controller: _noteController,
             decoration: InputDecoration(
               hintText: 'メモ（任意）',
-              hintStyle: TextStyle(color: AppColors.onSurfaceAlpha(0.3)),
+              hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
               filled: true,
               fillColor: AppColors.surfaceLow,
               border: OutlineInputBorder(
@@ -195,8 +223,8 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                   ? AppColors.warning
                   : AppColors.primary,
               foregroundColor: _isWithdrawal
-                  ? AppColors.primaryTextOnLight
-                  : AppColors.primaryTextOnLight,
+                  ? AppColors.onPrimary
+                  : AppColors.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
@@ -207,7 +235,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                     height: 24,
                     width: 24,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: AppColors.onPrimary,
                       strokeWidth: 2,
                     ),
                   )

@@ -42,6 +42,11 @@ abstract class ItemRepository {
   Future<void> deleteItem(String id);
 
   Future<void> updateItemsOrder(List<String> orderedIds);
+
+  /// ホームの主役カードに固定する / 固定を解除する。
+  ///
+  /// 固定は最大1件。[pinned] が true のとき、他アイテムの固定は解除される。
+  Future<void> setPinned(String id, bool pinned);
 }
 
 class DriftItemRepository implements ItemRepository {
@@ -177,6 +182,18 @@ class DriftItemRepository implements ItemRepository {
   @override
   Future<void> deleteItem(String id) async {
     await (_db.delete(_db.items)..where((t) => t.id.equals(id))).go();
+  }
+
+  @override
+  Future<void> setPinned(String id, bool pinned) async {
+    await _db.transaction(() async {
+      if (pinned) {
+        await (_db.update(_db.items)..where((t) => t.isPinned.equals(true)))
+            .write(const ItemsCompanion(isPinned: Value(false)));
+      }
+      await (_db.update(_db.items)..where((t) => t.id.equals(id)))
+          .write(ItemsCompanion(isPinned: Value(pinned)));
+    });
   }
 
   @override

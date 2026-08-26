@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/item_status.dart';
 import '../models/vault_item.dart';
-import '../database/settings_store.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
-import '../services/aggregation_service.dart';
-import '../services/exchange_rate_service.dart';
-import '../l10n/app_localizations.dart';
+import '../services/vault_selection.dart';
 import '../theme/app_colors.dart';
-import '../utils/format.dart';
-import '../utils/item_image_ref.dart';
-import '../widgets/item_cover_image.dart';
+import '../widgets/vault_hero_card.dart';
+import '../widgets/vault_tile.dart';
 import 'add_item_screen.dart';
+import 'completed_items_screen.dart';
 import 'item_detail_screen.dart';
+import 'onboarding_view.dart';
+import 'quick_add_sheet.dart';
 import 'settings_screen.dart';
 
+/// ホーム。「いま一番近い貯金箱」を主役に置き、その下に他の貯金箱を並べる。
+///
+/// 合計や純資産は出さない。貯金箱アプリなので、見たいのは個々の箱の進み具合。
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -24,1013 +27,399 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-enum _GoalsView { active, completed }
-
 class _HomeScreenState extends State<HomeScreen> {
-  _GoalsView _goalsView = _GoalsView.active;
+  /// カテゴリフィルタ: null=すべて, ''=カテゴリなし, それ以外=カテゴリ名
+  String? _categoryFilter;
 
-  /// カテゴリフィルタ（進行中のみ）: null=すべて, ''=カテゴリなし, それ以外=カテゴリ名
-  String? _selectedCategoryFilter;
+  /// 主役カードでいま表示している貯金箱。スワイプで変わる。
+  String? _heroItemId;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshRates();
-    });
+  Future<void> _openAddItem() {
+    return Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddItemScreen()),
+    );
   }
 
-  Future<void> _refreshRates() async {
-    final settings = context.read<SettingsStore>();
-    final exchange = context.read<ExchangeRateService>();
-    final base = await settings.getBaseCurrency();
-    final rates = await exchange.fetchRates(base);
-    if (!mounted) return;
-    if (rates.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.exchangeRateFetchFailed),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-    }
+  void _openItem(VaultItem item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
+    );
+  }
+
+  Future<void> _addMoney(VaultItem item) async {
+    await showQuickAddSheet(context, item);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddItemScreen()),
-        ),
-        backgroundColor: AppColors.secondary,
-        foregroundColor: AppColors.primaryTextOnLight,
-        elevation: 6,
-        highlightElevation: 10,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, size: 28),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'TARGET VAULT',
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SettingsScreen(),
-                        ),
-                      ),
-                      icon: Icon(
-                        Icons.settings,
-                        color: AppColors.onSurfaceAlpha(0.9),
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(child: _NetWorthHeader()),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                child: Text(
-                  AppLocalizations.of(context)!.goalsSectionTitle,
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurfaceAlpha(0.9),
-                  ),
-                ),
-              ),
-            ),
-            StreamBuilder<List<VaultItem>>(
-              stream: context.read<ItemRepository>().watchAllItems(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return SliverFillRemaining(
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  );
-                }
-                final all = snapshot.data!;
-                final items = all
-                    .where((i) => i.status != ItemStatus.completed)
-                    .toList();
-                final completed = all
-                    .where((i) => i.status == ItemStatus.completed)
-                    .toList();
+        child: StreamBuilder<List<VaultItem>>(
+          stream: context.read<ItemRepository>().watchAllItems(),
+          builder: (context, itemsSnap) {
+            if (!itemsSnap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final all = itemsSnap.data!;
+            final active = all
+                .where((i) => i.status != ItemStatus.completed)
+                .toList();
 
-                if (_goalsView == _GoalsView.completed) {
-                  return _buildCompletedGoalsSliver(completed);
-                }
-
-                final categorySet = items.map((i) => i.category).toSet();
-                final nonNullCategories =
-                    categorySet.whereType<String>().toList()..sort();
-                final categoryFilterOptions = <String>[
-                  if (categorySet.contains(null)) '',
-                  ...nonNullCategories,
+            // 残高は1本のクエリでまとめて取る（カードごとに引かない）。
+            return StreamBuilder<Map<String, double>>(
+              stream: context.read<TransactionRepository>().watchAllBalances(),
+              builder: (context, balanceSnap) {
+                final balances = balanceSnap.data ?? const <String, double>{};
+                final snapshots = [
+                  for (final item in active)
+                    VaultSnapshot(
+                      item: item,
+                      balance: balances[item.id] ?? 0,
+                    ),
                 ];
-                final filteredItems = _selectedCategoryFilter == null
-                    ? items
-                    : _selectedCategoryFilter == ''
-                    ? items.where((i) => i.category == null).toList()
-                    : items
-                          .where((i) => i.category == _selectedCategoryFilter)
-                          .toList();
 
-                if (items.isEmpty) {
-                  return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverMainAxisGroup(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildGoalsFiltersArea(
-                              categoryFilterOptions: const [],
-                            ),
-                          ),
-                        ),
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 32,
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.savings_outlined,
-                                    size: 64,
-                                    color: AppColors.onSurfaceAlpha(0.3),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    AppLocalizations.of(
-                                      context,
-                                    )!.emptyGoalsPrompt,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: AppColors.onSurfaceAlpha(0.5),
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  FilledButton.icon(
-                                    onPressed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const AddItemScreen(),
-                                      ),
-                                    ),
-                                    icon: const Icon(Icons.add, size: 20),
-                                    label: Text(
-                                      AppLocalizations.of(context)!.addItem,
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                if (active.isEmpty) {
+                  return _EmptyHome(
+                    hasCompleted: all.isNotEmpty,
+                    onStart: _openAddItem,
                   );
                 }
 
-                return SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverMainAxisGroup(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildGoalsFiltersArea(
-                            categoryFilterOptions: categoryFilterOptions,
-                          ),
-                        ),
-                      ),
-                      _buildItemListSliver(
-                        filteredItems: filteredItems,
-                        isReorderable: _selectedCategoryFilter == null,
-                      ),
-                    ],
-                  ),
+                return _Content(
+                  snapshots: snapshots,
+                  categoryFilter: _categoryFilter,
+                  heroItemId: _heroItemId,
+                  onHeroChanged: (id) => setState(() => _heroItemId = id),
+                  onCategoryChanged: (c) =>
+                      setState(() => _categoryFilter = c),
+                  onOpenItem: _openItem,
+                  onAddMoney: _addMoney,
                 );
               },
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 88)),
-          ],
+            );
+          },
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAddItem,
+        tooltip: l10n.addItem,
+        child: const Icon(Icons.add, size: 28),
       ),
     );
   }
+}
 
-  static const double _goalsSegmentHeight = 44;
+/// 上部のアプリ名と、設定・完了への導線。
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader();
 
-  /// 進行中/完了セグメント＋カテゴリ行。完了タブでも高さを揃える。
-  Widget _buildGoalsFiltersArea({required List<String> categoryFilterOptions}) {
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: _goalsSegmentHeight,
-          child: SegmentedButton<_GoalsView>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: _GoalsView.active,
-                label: Text(l10n.goalsViewActive),
-              ),
-              ButtonSegment(
-                value: _GoalsView.completed,
-                label: Text(l10n.goalsViewCompleted),
-              ),
-            ],
-            selected: {_goalsView},
-            onSelectionChanged: (selected) {
-              setState(() {
-                _goalsView = selected.first;
-                if (_goalsView == _GoalsView.completed) {
-                  _selectedCategoryFilter = null;
-                }
-              });
-            },
-            style: SegmentedButton.styleFrom(
-              selectedBackgroundColor: AppColors.secondary,
-              selectedForegroundColor: AppColors.primaryTextOnLight,
-              backgroundColor: AppColors.surfaceLow,
-              foregroundColor: AppColors.onSurfaceAlpha(0.85),
-              side: BorderSide(
-                color: AppColors.outlineVariant.withValues(alpha: 0.5),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              minimumSize: const Size(0, _goalsSegmentHeight),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.standard,
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Target Vault',
+              style: TextStyle(
+                fontFamily: 'Manrope',
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.onBackground,
+                letterSpacing: -0.2,
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 36,
-          child: categoryFilterOptions.isEmpty
-              ? const SizedBox.shrink()
-              : Align(
-                  alignment: Alignment.centerLeft,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        ...categoryFilterOptions.map((cat) {
-                          final label = cat.isEmpty ? l10n.categoryUnset : cat;
-                          final selected = _selectedCategoryFilter == cat;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(label),
-                              selected: selected,
-                              onSelected: (_) => setState(
-                                () => _selectedCategoryFilter = selected
-                                    ? null
-                                    : cat,
-                              ),
-                              selectedColor: AppColors.secondary.withValues(
-                                alpha: 0.35,
-                              ),
-                              backgroundColor: AppColors.surfaceLow,
-                              side: BorderSide(
-                                color: AppColors.outlineVariant.withValues(
-                                  alpha: 0.5,
-                                ),
-                              ),
-                              checkmarkColor: AppColors.secondary,
-                              labelStyle: TextStyle(
-                                color: selected
-                                    ? AppColors.onSurfaceAlpha(1)
-                                    : AppColors.onSurfaceAlpha(0.8),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                ),
-        ),
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CompletedItemsScreen()),
+            ),
+            tooltip: l10n.homeViewCompleted,
+            icon: const Icon(Icons.inventory_2_outlined),
+          ),
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+            tooltip: l10n.settingsTitle,
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 貯金箱が1件も無いとき。説明を並べず、次の一手だけ置く。
+class _EmptyHome extends StatelessWidget {
+  const _EmptyHome({required this.hasCompleted, required this.onStart});
+
+  /// 完了した貯金箱だけが残っている場合は、そこへの導線を残す。
+  final bool hasCompleted;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (hasCompleted) const _HomeHeader(),
+        Expanded(child: OnboardingView(onStart: onStart)),
+      ],
+    );
+  }
+}
+
+class _Content extends StatelessWidget {
+  const _Content({
+    required this.snapshots,
+    required this.categoryFilter,
+    required this.heroItemId,
+    required this.onHeroChanged,
+    required this.onCategoryChanged,
+    required this.onOpenItem,
+    required this.onAddMoney,
+  });
+
+  final List<VaultSnapshot> snapshots;
+  final String? categoryFilter;
+  final String? heroItemId;
+  final ValueChanged<String> onHeroChanged;
+  final ValueChanged<String?> onCategoryChanged;
+  final void Function(VaultItem) onOpenItem;
+  final Future<void> Function(VaultItem) onAddMoney;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    // 主役は「スワイプで選んだもの」→ 無ければ自動選定。
+    final hero = _resolveHero();
+    final others = snapshots
+        .where((s) => s.item.id != hero?.item.id)
+        .toList();
+
+    final categories = _categoryOptions();
+    final filtered = _applyFilter(others);
+
+    return CustomScrollView(
+      slivers: [
+        const SliverToBoxAdapter(child: _HomeHeader()),
+        if (hero != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: _SwipeableHero(
+                snapshots: snapshots,
+                current: hero,
+                onChanged: onHeroChanged,
+                onOpen: () => onOpenItem(hero.item),
+                onAddMoney: () => onAddMoney(hero.item),
+              ),
+            ),
+          ),
+        if (snapshots.length > 1)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Text(
+                l10n.homeOtherVaults,
+                style: Theme.of(context).textTheme.headlineMedium
+                    ?.copyWith(color: AppColors.onBackground),
+              ),
+            ),
+          ),
+        if (categories.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _CategoryFilters(
+              options: categories,
+              selected: categoryFilter,
+              onChanged: onCategoryChanged,
+            ),
+          ),
+        if (others.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            // 高さは中身に合わせる。固定比にすると文字サイズ最大で溢れる。
+            sliver: SliverGrid(
+              gridDelegate:
+                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 220,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                mainAxisExtent: 224,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final s = filtered[index];
+                return VaultTile(
+                  snapshot: s,
+                  onTap: () => onOpenItem(s.item),
+                );
+              }, childCount: filtered.length),
+            ),
+          ),
+        if (others.isNotEmpty && filtered.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
+              child: Text(
+                l10n.emptyVaultsTitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.onSurfaceVariant),
+              ),
+            ),
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
       ],
     );
   }
 
-  Widget _buildCompletedGoalsSliver(List<VaultItem> completed) {
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverMainAxisGroup(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildGoalsFiltersArea(categoryFilterOptions: const []),
-            ),
-          ),
-          if (completed.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 64,
-                      color: AppColors.onSurfaceAlpha(0.3),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      AppLocalizations.of(context)!.noCompletedGoalsYet,
-                      style: TextStyle(
-                        color: AppColors.onSurfaceAlpha(0.5),
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                return _CompletedGoalCard(item: completed[index]);
-              }, childCount: completed.length),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildItemListSliver({
-    required List<VaultItem> filteredItems,
-    required bool isReorderable,
-  }) {
-    if (isReorderable && filteredItems.isNotEmpty) {
-      return SliverReorderableList(
-        itemCount: filteredItems.length,
-        onReorder: (oldIndex, newIndex) {
-          if (oldIndex < newIndex) newIndex--;
-          final newOrder = List<VaultItem>.from(filteredItems);
-          final item = newOrder.removeAt(oldIndex);
-          newOrder.insert(newIndex, item);
-          context.read<ItemRepository>().updateItemsOrder(
-            newOrder.map((i) => i.id).toList(),
-          );
-        },
-        itemBuilder: (context, index) {
-          final item = filteredItems[index];
-          return _ItemCard(
-            key: ValueKey(item.id),
-            item: item,
-            overlayTopRight: _ItemCardTopActions(
-              item: item,
-              listReorderIndex: index,
-            ),
-          );
-        },
-      );
+  VaultSnapshot? _resolveHero() {
+    if (heroItemId != null) {
+      for (final s in snapshots) {
+        if (s.item.id == heroItemId) return s;
+      }
     }
+    return selectHeroVault(snapshots);
+  }
 
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final item = filteredItems[index];
-        return _ItemCard(
-          item: item,
-          overlayTopRight: _ItemCardTopActions(item: item),
-        );
-      }, childCount: filteredItems.length),
-    );
+  List<String> _categoryOptions() {
+    final set = snapshots.map((s) => s.item.category).toSet();
+    final named = set.whereType<String>().toList()..sort();
+    final options = [if (set.contains(null)) '', ...named];
+    // 選択肢が1つだけなら絞り込む意味がないので出さない。
+    return options.length < 2 ? const [] : options;
+  }
+
+  List<VaultSnapshot> _applyFilter(List<VaultSnapshot> list) {
+    if (categoryFilter == null) return list;
+    if (categoryFilter!.isEmpty) {
+      return list.where((s) => s.item.category == null).toList();
+    }
+    return list.where((s) => s.item.category == categoryFilter).toList();
   }
 }
 
-class _NetWorthHeader extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<VaultItem>>(
-      stream: context.read<ItemRepository>().watchAllItems(),
-      builder: (context, itemsSnapshot) {
-        if (!itemsSnapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: _NetWorthSkeleton(),
-          );
-        }
-        return FutureBuilder<({String baseCurrency, AggregationResult result})>(
-          future: _loadData(context, itemsSnapshot.data!),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                child: const _NetWorthSkeleton(),
-              );
-            }
-            final base = snapshot.data!.baseCurrency;
-            final r = snapshot.data!.result;
-            final l10n = AppLocalizations.of(context)!;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(16),
-              decoration: AppColors.glassCard(radius: 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _SubStat(
-                      label: l10n.totalSavings,
-                      value: formatCurrencyByCode(r.totalSavings, base),
-                      accentColor: AppColors.success,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _SubStat(
-                      label: l10n.totalDebt,
-                      value: formatCurrencyByCode(r.totalDebt, base),
-                      accentColor: AppColors.error,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<({String baseCurrency, AggregationResult result})> _loadData(
-    BuildContext context,
-    List<VaultItem> items,
-  ) async {
-    final settings = context.read<SettingsStore>();
-    final agg = context.read<AggregationService>();
-    final exchange = context.read<ExchangeRateService>();
-    final base = await settings.getBaseCurrency();
-    final result = await agg.computeWithBaseCurrency(items, base, exchange);
-    return (baseCurrency: base, result: result);
-  }
-}
-
-/// 貯めたお金 / 借りたお金 サマリー用スケルトン
-class _NetWorthSkeleton extends StatelessWidget {
-  const _NetWorthSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.onSurfaceAlpha(0.06)),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _skeletonStatBox()),
-          const SizedBox(width: 12),
-          Expanded(child: _skeletonStatBox()),
-        ],
-      ),
-    );
-  }
-
-  Widget _skeletonStatBox() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 56,
-            height: 12,
-            decoration: BoxDecoration(
-              color: AppColors.onSurfaceAlpha(0.12),
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: 88,
-            height: 22,
-            decoration: BoxDecoration(
-              color: AppColors.onSurfaceAlpha(0.18),
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubStat extends StatelessWidget {
-  const _SubStat({
-    required this.label,
-    required this.value,
-    required this.accentColor,
+/// 主役カードを左右スワイプで切り替える。設定を増やさずに「他も見たい」を satisfy する。
+class _SwipeableHero extends StatefulWidget {
+  const _SwipeableHero({
+    required this.snapshots,
+    required this.current,
+    required this.onChanged,
+    required this.onOpen,
+    required this.onAddMoney,
   });
 
-  final String label;
-  final String value;
-  final Color accentColor;
+  final List<VaultSnapshot> snapshots;
+  final VaultSnapshot current;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onOpen;
+  final VoidCallback onAddMoney;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: accentColor,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontFamily: 'Manrope',
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-              letterSpacing: -0.3,
-              height: 1.1,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
+  State<_SwipeableHero> createState() => _SwipeableHeroState();
 }
 
-class _CompletedGoalCard extends StatelessWidget {
-  const _CompletedGoalCard({required this.item});
-
-  final VaultItem item;
-
+class _SwipeableHeroState extends State<_SwipeableHero> {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
+    final l10n = AppLocalizations.of(context)!;
+    final items = widget.snapshots;
+    final index = items.indexWhere((s) => s.item.id == widget.current.item.id);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          onHorizontalDragEnd: items.length < 2
+              ? null
+              : (details) {
+                  final v = details.primaryVelocity ?? 0;
+                  if (v == 0) return;
+                  final next = v < 0 ? index + 1 : index - 1;
+                  final wrapped = (next + items.length) % items.length;
+                  widget.onChanged(items[wrapped].item.id);
+                },
+          child: VaultHeroCard(
+            snapshot: widget.current,
+            onAddMoney: widget.onAddMoney,
+            onOpen: widget.onOpen,
           ),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.onSurfaceAlpha(0.06)),
-            ),
+        ),
+        if (items.length > 1) ...[
+          const SizedBox(height: 12),
+          Semantics(
+            label: l10n.homeSwipeHint,
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: itemImageRefIsDisplayable(item.imagePath)
-                        ? ItemCoverImage(
-                            imageRef: item.imagePath!,
-                            fit: BoxFit.cover,
-                          )
-                        : Container(
-                            color: AppColors.success.withValues(alpha: 0.2),
-                            child: Icon(
-                              Icons.check_circle,
-                              size: 28,
-                              color: AppColors.onSurfaceAlpha(0.7),
-                            ),
-                          ),
+                for (var i = 0; i < items.length; i++)
+                  Container(
+                    width: i == index ? 20 : 6,
+                    height: 6,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: i == index
+                          ? AppColors.primaryOutline
+                          : AppColors.outlineVariant,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurfaceAlpha(1),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppLocalizations.of(context)!.purchasedFor(
-                          formatCurrencyByCode(
-                            item.targetAmount,
-                            item.currency,
-                          ),
-                        ),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.onSurfaceAlpha(0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right, color: AppColors.onSurfaceAlpha(0.4)),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// カード右上: 編集（常時）と、並び替えリスト内ではドラッグハンドル
-class _ItemCardTopActions extends StatelessWidget {
-  const _ItemCardTopActions({required this.item, this.listReorderIndex});
-
-  final VaultItem item;
-  final int? listReorderIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final edit = Tooltip(
-      message: '編集',
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AddItemScreen(editItem: item)),
-            );
-          },
-          borderRadius: BorderRadius.circular(999),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Icon(
-              Icons.edit_outlined,
-              size: 18,
-              color: AppColors.onSurfaceAlpha(0.9),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final dragHandle = Material(
-      type: MaterialType.transparency,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 10, 8),
-        child: Icon(
-          Icons.drag_indicator,
-          size: 22,
-          color: AppColors.onSurfaceAlpha(0.85),
-        ),
-      ),
-    );
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          edit,
-          if (listReorderIndex != null)
-            ReorderableDragStartListener(
-              index: listReorderIndex!,
-              child: dragHandle,
-            ),
         ],
-      ),
+      ],
     );
   }
 }
 
-/// アイテムカード用のスケルトン（金額取得中）
-class _ItemCardSkeleton extends StatelessWidget {
-  const _ItemCardSkeleton({
-    required this.item,
-    required this.onTap,
-    this.overlayTopRight,
+/// カテゴリの絞り込み。未選択でも枠が見えるようにして押しやすくする。
+class _CategoryFilters extends StatelessWidget {
+  const _CategoryFilters({
+    required this.options,
+    required this.selected,
+    required this.onChanged,
   });
 
-  final VaultItem item;
-  final VoidCallback onTap;
-  final Widget? overlayTopRight;
+  final List<String> options;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 100,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.onSurfaceAlpha(0.06), width: 1),
-          ),
-          child: Stack(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColors.onSurfaceAlpha(0.08),
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(16),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            item.title,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurfaceAlpha(1),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: AppColors.onSurfaceAlpha(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: 72,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: AppColors.onSurfaceAlpha(0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Icon(
-                      Icons.chevron_right,
-                      color: AppColors.onSurfaceAlpha(0.4),
-                    ),
-                  ),
-                ],
-              ),
-              if (overlayTopRight == null)
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                ),
-              if (overlayTopRight != null)
-                Positioned(top: 10, right: 10, child: overlayTopRight!),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ItemCard extends StatelessWidget {
-  const _ItemCard({super.key, required this.item, this.overlayTopRight});
-
-  final VaultItem item;
-  final Widget? overlayTopRight;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<double>(
-      future: context.read<TransactionRepository>().getCurrentAmount(item.id),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _ItemCardSkeleton(
-              item: item,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
-              ),
-              overlayTopRight: overlayTopRight,
+    final l10n = AppLocalizations.of(context)!;
+    return SizedBox(
+      height: 56,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        itemCount: options.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final value = options[index];
+          final isSelected = selected == value;
+          return FilterChip(
+            label: Text(value.isEmpty ? l10n.categoryUnset : value),
+            selected: isSelected,
+            showCheckmark: false,
+            onSelected: (_) => onChanged(isSelected ? null : value),
+            side: BorderSide(
+              color: isSelected
+                  ? AppColors.primaryOutline
+                  : AppColors.outline,
             ),
           );
-        }
-        final amount = snapshot.data ?? 0;
-        final progress = item.targetAmount > 0
-            ? (amount / item.targetAmount).clamp(0.0, 1.0)
-            : 0.0;
-        final isRepaying = item.status == ItemStatus.repaying || amount < 0;
-        final saturation = isRepaying ? 0.4 : (0.5 + progress * 0.5);
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
-              ),
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                height: 220,
-                padding: const EdgeInsets.all(0),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    clipBehavior: Clip.none,
-                    children: [
-                      if (itemImageRefIsDisplayable(item.imagePath))
-                        ItemCoverImage(
-                          imageRef: item.imagePath!,
-                          fit: BoxFit.cover,
-                          color: Color.fromRGBO(
-                            255,
-                            255,
-                            255,
-                            saturation.toDouble(),
-                          ),
-                          colorBlendMode: BlendMode.saturation,
-                        )
-                      else
-                        Container(color: AppColors.surfaceHigh),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.22),
-                              Colors.black.withValues(alpha: 0.86),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontFamily: 'Manrope',
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${formatCurrencyByCode(amount, item.currency)} / ${formatCurrencyByCode(item.targetAmount, item.currency)}',
-                              style: TextStyle(
-                                color: AppColors.onSurfaceAlpha(0.95),
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: LinearProgressIndicator(
-                                value: progress,
-                                minHeight: 6,
-                                backgroundColor: Colors.white.withValues(
-                                  alpha: 0.2,
-                                ),
-                                valueColor: AlwaysStoppedAnimation(
-                                  isRepaying
-                                      ? AppColors.warning
-                                      : AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (overlayTopRight != null)
-                        Positioned(top: 10, right: 10, child: overlayTopRight!),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 }

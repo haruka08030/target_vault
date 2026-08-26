@@ -27,6 +27,9 @@ class Items extends Table {
   TextColumn get category => text().nullable()();
   TextColumn get status => text().map(const ItemStatusConverter())();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  /// ホームの主役カードに固定するアイテム。固定は最大1件。
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
@@ -64,13 +67,16 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.memoryForTests() : super(memoryTestExecutor());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
         await migrator.addColumn(items, items.sortOrder);
+      }
+      if (from < 3) {
+        await migrator.addColumn(items, items.isPinned);
       }
     },
   );

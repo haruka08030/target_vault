@@ -1,107 +1,11 @@
-import '../models/item_status.dart';
-import '../models/vault_item.dart';
-import '../repositories/transaction_repository.dart';
-import 'exchange_rate_service.dart';
-
-class AggregationResult {
-  AggregationResult({
-    required this.totalSavings,
-    required this.totalDebt,
-    required this.netWorth,
-    required this.itemsWithAmounts,
-  });
-
-  final double totalSavings;
-  final double totalDebt;
-  final double netWorth;
-  final Map<String, double> itemsWithAmounts;
-}
-
-class AggregationService {
-  AggregationService(this._txRepo);
-
-  final TransactionRepository _txRepo;
-
-  Future<AggregationResult> computeWithBaseCurrency(
-    List<VaultItem> items,
-    String baseCurrency,
-    ExchangeRateService exchange,
-  ) async {
-    double totalSavings = 0;
-    double totalDebt = 0;
-    final itemsWithAmounts = <String, double>{};
-
-    for (final item in items) {
-      final rawAmount = await _txRepo.getCurrentAmount(item.id);
-      final amount = await exchange.toBaseCurrency(rawAmount, item.currency);
-      itemsWithAmounts[item.id] = amount;
-
-      switch (item.status) {
-        case ItemStatus.saving:
-          if (amount >= 0) {
-            totalSavings += amount;
-          } else {
-            totalDebt += -amount;
-          }
-          break;
-        case ItemStatus.repaying:
-          if (amount < 0) {
-            totalDebt += -amount;
-          } else {
-            totalSavings += amount;
-          }
-          break;
-        case ItemStatus.completed:
-          break;
-      }
-    }
-
-    return AggregationResult(
-      totalSavings: totalSavings,
-      totalDebt: totalDebt,
-      netWorth: totalSavings - totalDebt,
-      itemsWithAmounts: itemsWithAmounts,
-    );
-  }
-
-  Future<AggregationResult> compute(List<VaultItem> items) async {
-    double totalSavings = 0;
-    double totalDebt = 0;
-    final itemsWithAmounts = <String, double>{};
-
-    for (final item in items) {
-      final amount = await _txRepo.getCurrentAmount(item.id);
-      itemsWithAmounts[item.id] = amount;
-
-      switch (item.status) {
-        case ItemStatus.saving:
-          if (amount >= 0) {
-            totalSavings += amount;
-          } else {
-            totalDebt += -amount;
-          }
-          break;
-        case ItemStatus.repaying:
-          if (amount < 0) {
-            totalDebt += -amount;
-          } else {
-            totalSavings += amount;
-          }
-          break;
-        case ItemStatus.completed:
-          break;
-      }
-    }
-
-    return AggregationResult(
-      totalSavings: totalSavings,
-      totalDebt: totalDebt,
-      netWorth: totalSavings - totalDebt,
-      itemsWithAmounts: itemsWithAmounts,
-    );
-  }
-
-  /// Predicted date from recent deposit pace (weighted average for accuracy)
+/// 入金ペースから目標到達日を予測する。
+///
+/// 合計・純資産の集計は行わない（貯金箱ごとに見るアプリのため撤去済み）。
+/// 通貨はアイテム単位で完結し、換算もしない。
+abstract final class AggregationService {
+  /// 直近の入金ペースから到達予定日を出す。
+  ///
+  /// 達成済み・入金実績が足りない場合は null。
   static DateTime? computePredictedDate({
     required double currentAmount,
     required double targetAmount,

@@ -16,7 +16,7 @@ class CompletedItemsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -51,13 +51,13 @@ class CompletedItemsScreen extends StatelessWidget {
                   Icon(
                     Icons.check_circle_outline,
                     size: 64,
-                    color: AppColors.onSurfaceAlpha(0.3),
+                    color: AppColors.onSurfaceVariant,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'まだ完了したアイテムはありません',
                     style: TextStyle(
-                      color: AppColors.onSurfaceAlpha(0.5),
+                      color: AppColors.onSurfaceVariant,
                       fontSize: 16,
                     ),
                   ),
@@ -102,7 +102,7 @@ class _CompletedItemCard extends StatelessWidget {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.onSurfaceAlpha(0.06),
+                color: AppColors.outlineVariant,
                 width: 1,
               ),
             ),
@@ -138,7 +138,7 @@ class _CompletedItemCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.onSurfaceAlpha(1),
+                          color: AppColors.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -148,13 +148,13 @@ class _CompletedItemCard extends StatelessWidget {
                         '${formatCurrencyByCode(item.targetAmount, item.currency)} で購入済み',
                         style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.onSurfaceAlpha(0.6),
+                          color: AppColors.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: AppColors.onSurfaceAlpha(0.4)),
+                Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
               ],
             ),
           ),
