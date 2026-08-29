@@ -144,22 +144,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     ).showSnackBar(SnackBar(content: Text(l10n.archivedSnack)));
   }
 
-  /// その他の操作。破壊度が違うものを並べるのでシートで出す。
-  Future<void> _onMoreActions() async {
-    final l10n = AppLocalizations.of(context)!;
-    final action = await showAppActionSheet<String>(
-      context,
-      actions: [
-        if (_item.status != ItemStatus.archived)
-          AppSheetAction(value: 'archive', label: l10n.archiveItem),
-        AppSheetAction(
-          value: 'delete',
-          label: l10n.deleteThisItem,
-          isDestructive: true,
-        ),
-      ],
-    );
-    if (!mounted) return;
+  /// 「その他」で選ばれた操作を実行する。
+  Future<void> _onMoreAction(String action) async {
     switch (action) {
       case 'archive':
         await _onArchiveItem();
@@ -207,10 +193,24 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             tooltip: l10n.editItem,
             icon: const Icon(Icons.edit_outlined),
           ),
-          IconButton(
-            onPressed: _onMoreActions,
-            tooltip: l10n.moreActions,
+          AppMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
+            tooltip: l10n.moreActions,
+            onSelected: _onMoreAction,
+            actions: [
+              if (_item.status != ItemStatus.archived)
+                AppSheetAction(
+                  value: 'archive',
+                  label: l10n.archiveItem,
+                  icon: Icons.inventory_2_outlined,
+                ),
+              AppSheetAction(
+                value: 'delete',
+                label: l10n.deleteThisItem,
+                isDestructive: true,
+                icon: Icons.delete_outline,
+              ),
+            ],
           ),
         ],
       ),

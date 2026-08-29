@@ -45,43 +45,54 @@ void main() {
     );
   });
 
-  testWidgets('その他の操作はアクションシートで出す', (tester) async {
+  testWidgets('その他の操作は … の近くにメニューで出す', (tester) async {
+    String? picked;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.theme,
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: TextButton(
-                onPressed: () => showAppActionSheet<String>(
-                  context,
-                  actions: const [
-                    AppSheetAction(value: 'archive', label: 'アーカイブ'),
-                    AppSheetAction(
-                      value: 'delete',
-                      label: 'この貯金箱を削除',
-                      isDestructive: true,
-                    ),
-                  ],
-                ),
-                child: const Text('open'),
+        home: Scaffold(
+          appBar: AppBar(
+            actions: [
+              AppMenuButton<String>(
+                icon: const Icon(Icons.more_horiz),
+                onSelected: (v) => picked = v,
+                actions: const [
+                  AppSheetAction(
+                    value: 'archive',
+                    label: 'アーカイブ',
+                    icon: Icons.inventory_2_outlined,
+                  ),
+                  AppSheetAction(
+                    value: 'delete',
+                    label: 'この貯金箱を削除',
+                    isDestructive: true,
+                    icon: Icons.delete_outline,
+                  ),
+                ],
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
 
-    await tester.tap(find.text('open'));
+    await tester.tap(find.byIcon(Icons.more_horiz));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    // 下から出るシートではなく、その場に開くメニュー
+    expect(find.byType(CupertinoActionSheet), findsNothing);
     expect(find.text('アーカイブ'), findsOneWidget);
     expect(find.text('この貯金箱を削除'), findsOneWidget);
 
-    await expectLater(
-      find.byType(CupertinoActionSheet),
-      matchesGoldenFile('goldens/action_sheet.png'),
-    );
+    // メニューはボタン（画面右上）の近くに開く
+    final button = tester.getRect(find.byIcon(Icons.more_horiz));
+    final menuItem = tester.getRect(find.text('アーカイブ'));
+    expect(menuItem.top, greaterThan(button.top));
+    expect(menuItem.top - button.bottom, lessThan(80));
+    expect(menuItem.right, greaterThan(tester.getSize(find.byType(Scaffold)).width / 2));
+
+    await tester.tap(find.text('アーカイブ'));
+    await tester.pumpAndSettle();
+    expect(picked, 'archive');
   });
 }
