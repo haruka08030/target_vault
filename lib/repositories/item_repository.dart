@@ -47,6 +47,14 @@ abstract class ItemRepository {
   ///
   /// 固定は最大1件。[pinned] が true のとき、他アイテムの固定は解除される。
   Future<void> setPinned(String id, bool pinned);
+
+  /// 貯金箱を棚から下ろす（買わないことにした）。履歴は残す。
+  ///
+  /// 主役カードに固定されていた場合は固定も外す。
+  Future<void> archiveItem(String id);
+
+  /// アーカイブした貯金箱を貯金中に戻す。
+  Future<void> unarchiveItem(String id);
 }
 
 class DriftItemRepository implements ItemRepository {
@@ -194,6 +202,28 @@ class DriftItemRepository implements ItemRepository {
       await (_db.update(_db.items)..where((t) => t.id.equals(id)))
           .write(ItemsCompanion(isPinned: Value(pinned)));
     });
+  }
+
+  @override
+  Future<void> archiveItem(String id) async {
+    await (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
+      ItemsCompanion(
+        status: const Value(ItemStatus.archived),
+        // 棚から下ろすので固定も外す。
+        isPinned: const Value(false),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Future<void> unarchiveItem(String id) async {
+    await (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
+      ItemsCompanion(
+        status: const Value(ItemStatus.saving),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   @override

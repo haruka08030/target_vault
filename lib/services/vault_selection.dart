@@ -58,7 +58,7 @@ VaultSnapshot? selectHeroVault(
   DateTime? now,
 }) {
   final candidates = snapshots
-      .where((s) => s.item.status != ItemStatus.completed)
+      .where((s) => s.item.status.isActive)
       .toList();
   if (candidates.isEmpty) return null;
 

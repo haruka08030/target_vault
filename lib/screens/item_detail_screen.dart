@@ -58,7 +58,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         title: l10n.detailPurchaseTitle,
         content: Text(l10n.detailPurchaseConfirm),
         confirmLabel: l10n.detailPurchaseDone,
-        confirmColor: AppColors.success,
       );
     } else {
       confirmed = await showAppConfirmDialog(
@@ -70,7 +69,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           ),
         ),
         confirmLabel: l10n.detailBuyOnCreditConfirmLabel,
-        confirmColor: AppColors.warning,
       );
     }
     if (confirmed != true || !mounted) return;
@@ -128,6 +126,48 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     ).showSnackBar(SnackBar(content: Text(l10n.itemDeleted)));
   }
 
+  /// 棚から下ろす（買わないことにした）。履歴は残り、あとで戻せる。
+  Future<void> _onArchiveItem() async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: l10n.archiveItemTitle,
+      content: Text(l10n.archiveItemConfirm(_item.title)),
+      confirmLabel: l10n.archiveItem,
+    );
+    if (confirmed != true || !mounted) return;
+    await context.read<ItemRepository>().archiveItem(_item.id);
+    if (!mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.archivedSnack)));
+  }
+
+  /// その他の操作。破壊度が違うものを並べるのでシートで出す。
+  Future<void> _onMoreActions() async {
+    final l10n = AppLocalizations.of(context)!;
+    final action = await showAppActionSheet<String>(
+      context,
+      actions: [
+        if (_item.status != ItemStatus.archived)
+          AppSheetAction(value: 'archive', label: l10n.archiveItem),
+        AppSheetAction(
+          value: 'delete',
+          label: l10n.deleteThisItem,
+          isDestructive: true,
+        ),
+      ],
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'archive':
+        await _onArchiveItem();
+      case 'delete':
+        await _onDeleteItem();
+    }
+  }
+
   /// ホームの主役カードに固定する / 解除する。固定は最大1件。
   Future<void> _onTogglePinned() async {
     final l10n = AppLocalizations.of(context)!;
@@ -167,30 +207,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             tooltip: l10n.editItem,
             icon: const Icon(Icons.edit_outlined),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'delete') _onDeleteItem();
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.delete_outline,
-                      color: AppColors.error,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.deleteThisItem,
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            onPressed: _onMoreActions,
+            tooltip: l10n.moreActions,
+            icon: const Icon(Icons.more_horiz),
           ),
         ],
       ),

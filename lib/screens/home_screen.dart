@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
-import '../models/item_status.dart';
 import '../models/vault_item.dart';
 import '../repositories/item_repository.dart';
 import '../repositories/transaction_repository.dart';
@@ -66,9 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             final all = itemsSnap.data!;
-            final active = all
-                .where((i) => i.status != ItemStatus.completed)
-                .toList();
+            final active = all.where((i) => i.status.isActive).toList();
 
             // 残高は1本のクエリでまとめて取る（カードごとに引かない）。
             return StreamBuilder<Map<String, double>>(

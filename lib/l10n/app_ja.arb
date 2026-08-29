@@ -121,5 +121,17 @@
   "detailDaysLate": "{days}日おそい見込み",
   "detailNoTransactions": "まだ入出金がありません",
   "invalidAmount": "正しい金額を入力してください",
-  "deleteTransactionConfirm": "この入出金を削除しますか？"
+  "deleteTransactionConfirm": "この入出金を削除しますか？",
+  "archiveItem": "アーカイブ",
+  "archiveItemTitle": "この貯金箱をアーカイブ",
+  "archiveItemConfirm": "「{title}」を棚から下ろします。履歴は残り、いつでも戻せます。",
+  "archivedSnack": "アーカイブしました",
+  "unarchiveItem": "棚に戻す",
+  "unarchivedSnack": "棚に戻しました",
+  "shelfTitle": "棚から下ろした箱",
+  "sectionCompleted": "完了",
+  "sectionArchived": "アーカイブ",
+  "emptyOffShelf": "まだ何もありません",
+  "emptyOffShelfBody": "買い終えた箱や、やめた箱がここに入ります。",
+  "moreActions": "その他"
 }

@@ -336,4 +336,42 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get deleteTransactionConfirm => 'この入出金を削除しますか？';
+
+  @override
+  String get archiveItem => 'アーカイブ';
+
+  @override
+  String get archiveItemTitle => 'この貯金箱をアーカイブ';
+
+  @override
+  String archiveItemConfirm(String title) {
+    return '「$title」を棚から下ろします。履歴は残り、いつでも戻せます。';
+  }
+
+  @override
+  String get archivedSnack => 'アーカイブしました';
+
+  @override
+  String get unarchiveItem => '棚に戻す';
+
+  @override
+  String get unarchivedSnack => '棚に戻しました';
+
+  @override
+  String get shelfTitle => '棚から下ろした箱';
+
+  @override
+  String get sectionCompleted => '完了';
+
+  @override
+  String get sectionArchived => 'アーカイブ';
+
+  @override
+  String get emptyOffShelf => 'まだ何もありません';
+
+  @override
+  String get emptyOffShelfBody => '買い終えた箱や、やめた箱がここに入ります。';
+
+  @override
+  String get moreActions => 'その他';
 }

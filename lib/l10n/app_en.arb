@@ -194,5 +194,24 @@
   },
   "detailNoTransactions": "No money in or out yet",
   "invalidAmount": "Please enter a valid amount",
-  "deleteTransactionConfirm": "Delete this record?"
+  "deleteTransactionConfirm": "Delete this record?",
+  "archiveItem": "Archive",
+  "archiveItemTitle": "Archive this jar",
+  "archiveItemConfirm": "“{title}” moves off your shelf. The history stays, and you can bring it back anytime.",
+  "@archiveItemConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "archivedSnack": "Moved to the archive",
+  "unarchiveItem": "Bring back",
+  "unarchivedSnack": "Back on your shelf",
+  "shelfTitle": "Off the shelf",
+  "sectionCompleted": "Completed",
+  "sectionArchived": "Archived",
+  "emptyOffShelf": "Nothing here yet",
+  "emptyOffShelfBody": "Jars you buy or give up on end up here.",
+  "moreActions": "More"
 }

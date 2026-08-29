@@ -343,4 +343,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteTransactionConfirm => 'Delete this record?';
+
+  @override
+  String get archiveItem => 'Archive';
+
+  @override
+  String get archiveItemTitle => 'Archive this jar';
+
+  @override
+  String archiveItemConfirm(String title) {
+    return '“$title” moves off your shelf. The history stays, and you can bring it back anytime.';
+  }
+
+  @override
+  String get archivedSnack => 'Moved to the archive';
+
+  @override
+  String get unarchiveItem => 'Bring back';
+
+  @override
+  String get unarchivedSnack => 'Back on your shelf';
+
+  @override
+  String get shelfTitle => 'Off the shelf';
+
+  @override
+  String get sectionCompleted => 'Completed';
+
+  @override
+  String get sectionArchived => 'Archived';
+
+  @override
+  String get emptyOffShelf => 'Nothing here yet';
+
+  @override
+  String get emptyOffShelfBody => 'Jars you buy or give up on end up here.';
+
+  @override
+  String get moreActions => 'More';
 }

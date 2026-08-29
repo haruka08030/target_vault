@@ -703,6 +703,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete this record?'**
   String get deleteTransactionConfirm;
+
+  /// No description provided for @archiveItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get archiveItem;
+
+  /// No description provided for @archiveItemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive this jar'**
+  String get archiveItemTitle;
+
+  /// No description provided for @archiveItemConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” moves off your shelf. The history stays, and you can bring it back anytime.'**
+  String archiveItemConfirm(String title);
+
+  /// No description provided for @archivedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to the archive'**
+  String get archivedSnack;
+
+  /// No description provided for @unarchiveItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring back'**
+  String get unarchiveItem;
+
+  /// No description provided for @unarchivedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back on your shelf'**
+  String get unarchivedSnack;
+
+  /// No description provided for @shelfTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off the shelf'**
+  String get shelfTitle;
+
+  /// No description provided for @sectionCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get sectionCompleted;
+
+  /// No description provided for @sectionArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get sectionArchived;
+
+  /// No description provided for @emptyOffShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here yet'**
+  String get emptyOffShelf;
+
+  /// No description provided for @emptyOffShelfBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Jars you buy or give up on end up here.'**
+  String get emptyOffShelfBody;
+
+  /// No description provided for @moreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get moreActions;
 }
 
 class _AppLocalizationsDelegate

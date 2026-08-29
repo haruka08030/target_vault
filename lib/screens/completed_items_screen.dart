@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/item_status.dart';
 import '../models/vault_item.dart';
 import '../repositories/item_repository.dart';
@@ -10,68 +11,52 @@ import '../utils/item_image_ref.dart';
 import '../widgets/item_cover_image.dart';
 import 'item_detail_screen.dart';
 
+/// 棚から下ろした貯金箱の一覧。
+///
+/// 「完了（買い終えた）」と「アーカイブ（やめた）」を2セクションで並べる。
+/// 意味の違うものを混ぜないが、画面は分けない。
 class CompletedItemsScreen extends StatelessWidget {
   const CompletedItemsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back, color: AppColors.onSurfaceAlpha(0.9)),
-        ),
-        title: Text(
-          '完了したアイテム',
-          style: TextStyle(
-            color: AppColors.onSurfaceAlpha(0.95),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+      appBar: AppBar(title: Text(l10n.shelfTitle)),
       body: StreamBuilder<List<VaultItem>>(
         stream: context.read<ItemRepository>().watchAllItems(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
-          final completed = snapshot.data!
+          final all = snapshot.data!;
+          final completed = all
               .where((i) => i.status == ItemStatus.completed)
               .toList();
-          if (completed.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 64,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'まだ完了したアイテムはありません',
-                    style: TextStyle(
-                      color: AppColors.onSurfaceVariant,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            );
+          final archived = all
+              .where((i) => i.status == ItemStatus.archived)
+              .toList();
+
+          if (completed.isEmpty && archived.isEmpty) {
+            return _Empty(l10n: l10n);
           }
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            itemCount: completed.length,
-            itemBuilder: (context, index) {
-              final item = completed[index];
-              return _CompletedItemCard(item: item);
-            },
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+            children: [
+              if (completed.isNotEmpty) ...[
+                _SectionLabel(text: l10n.sectionCompleted),
+                for (final item in completed)
+                  _ShelfCard(item: item, isArchived: false),
+              ],
+              if (archived.isNotEmpty) ...[
+                _SectionLabel(text: l10n.sectionArchived),
+                for (final item in archived)
+                  _ShelfCard(item: item, isArchived: true),
+              ],
+            ],
           );
         },
       ),
@@ -79,37 +64,101 @@ class CompletedItemsScreen extends StatelessWidget {
   }
 }
 
-class _CompletedItemCard extends StatelessWidget {
-  const _CompletedItemCard({required this.item});
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.text});
 
-  final VaultItem item;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 10),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontFamily: 'Manrope',
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: AppColors.onBackground,
+        ),
+      ),
+    );
+  }
+}
+
+class _Empty extends StatelessWidget {
+  const _Empty({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              size: 56,
+              color: AppColors.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.emptyOffShelf,
+              style: const TextStyle(
+                fontFamily: 'Manrope',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onBackground,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.emptyOffShelfBody,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 棚から下ろした箱1件。アーカイブはその場で戻せる。
+class _ShelfCard extends StatelessWidget {
+  const _ShelfCard({required this.item, required this.isArchived});
+
+  final VaultItem item;
+  final bool isArchived;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: Colors.transparent,
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
           ),
-          borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.outlineVariant,
-                width: 1,
-              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   child: SizedBox(
                     width: 56,
                     height: 56,
@@ -118,26 +167,33 @@ class _CompletedItemCard extends StatelessWidget {
                             imageRef: item.imagePath!,
                             fit: BoxFit.cover,
                           )
-                        : Container(
-                            color: AppColors.success.withValues(alpha: 0.2),
+                        : ColoredBox(
+                            color: isArchived
+                                ? AppColors.surfaceHigh
+                                : AppColors.primaryLight,
                             child: Icon(
-                              Icons.check_circle,
-                              size: 28,
-                              color: AppColors.onSurfaceAlpha(0.7),
+                              isArchived
+                                  ? Icons.inventory_2_outlined
+                                  : Icons.check_circle,
+                              size: 26,
+                              color: isArchived
+                                  ? AppColors.onSurfaceVariant
+                                  : AppColors.onPrimary,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         item.title,
-                        style: TextStyle(
+                        style: const TextStyle(
+                          fontFamily: 'Manrope',
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.onSurface,
                         ),
                         maxLines: 1,
@@ -145,16 +201,44 @@ class _CompletedItemCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${formatCurrencyByCode(item.targetAmount, item.currency)} で購入済み',
-                        style: TextStyle(
+                        isArchived
+                            ? formatCurrencyByCode(
+                                item.targetAmount,
+                                item.currency,
+                              )
+                            : l10n.purchasedFor(
+                                formatCurrencyByCode(
+                                  item.targetAmount,
+                                  item.currency,
+                                ),
+                              ),
+                        style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.onSurfaceVariant,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
+                if (isArchived)
+                  TextButton(
+                    onPressed: () async {
+                      final repo = context.read<ItemRepository>();
+                      final messenger = ScaffoldMessenger.of(context);
+                      await repo.unarchiveItem(item.id);
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(l10n.unarchivedSnack)),
+                      );
+                    },
+                    child: Text(l10n.unarchiveItem),
+                  )
+                else
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.onSurfaceVariant,
+                  ),
               ],
             ),
           ),

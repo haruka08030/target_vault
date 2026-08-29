@@ -354,6 +354,25 @@ class FakeItemRepository implements ItemRepository {
   }
 
   @override
+  Future<void> archiveItem(String id) async {
+    final idx = _b.items.indexWhere((e) => e.id == id);
+    if (idx < 0) return;
+    _b.items[idx] = _b.items[idx].copyWith(
+      status: ItemStatus.archived,
+      isPinned: false,
+    );
+    _b._emitItems();
+  }
+
+  @override
+  Future<void> unarchiveItem(String id) async {
+    final idx = _b.items.indexWhere((e) => e.id == id);
+    if (idx < 0) return;
+    _b.items[idx] = _b.items[idx].copyWith(status: ItemStatus.saving);
+    _b._emitItems();
+  }
+
+  @override
   Future<void> setPinned(String id, bool pinned) async {
     for (var i = 0; i < _b.items.length; i++) {
       final item = _b.items[i];
