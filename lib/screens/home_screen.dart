@@ -77,10 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final balances = balanceSnap.data ?? const <String, double>{};
                 final snapshots = [
                   for (final item in active)
-                    VaultSnapshot(
-                      item: item,
-                      balance: balances[item.id] ?? 0,
-                    ),
+                    VaultSnapshot(item: item, balance: balances[item.id] ?? 0),
                 ];
 
                 if (active.isEmpty) {
@@ -95,8 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   categoryFilter: _categoryFilter,
                   heroItemId: _heroItemId,
                   onHeroChanged: (id) => setState(() => _heroItemId = id),
-                  onCategoryChanged: (c) =>
-                      setState(() => _categoryFilter = c),
+                  onCategoryChanged: (c) => setState(() => _categoryFilter = c),
                   onOpenItem: _openItem,
                   onAddMoney: _addMoney,
                 );
@@ -202,13 +198,13 @@ class _Content extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     // 主役は「スワイプで選んだもの」→ 無ければ自動選定。
+    //
+    // 主役はピックアップとして上に浮いているだけで、棚（タイル）からは
+    // 抜かない。抜くとスワイプのたびに並びが組み替わり、探しづらくなる。
     final hero = _resolveHero();
-    final others = snapshots
-        .where((s) => s.item.id != hero?.item.id)
-        .toList();
 
     final categories = _categoryOptions();
-    final filtered = _applyFilter(others);
+    final filtered = _applyFilter(snapshots);
 
     return CustomScrollView(
       slivers: [
@@ -231,9 +227,10 @@ class _Content extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Text(
-                l10n.homeOtherVaults,
-                style: Theme.of(context).textTheme.headlineMedium
-                    ?.copyWith(color: AppColors.onBackground),
+                l10n.homeAllVaults,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: AppColors.onBackground,
+                ),
               ),
             ),
           ),
@@ -245,13 +242,12 @@ class _Content extends StatelessWidget {
               onChanged: onCategoryChanged,
             ),
           ),
-        if (others.isNotEmpty)
+        if (snapshots.isNotEmpty)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             // 高さは中身に合わせる。固定比にすると文字サイズ最大で溢れる。
             sliver: SliverGrid(
-              gridDelegate:
-                  const SliverGridDelegateWithMaxCrossAxisExtent(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 220,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
@@ -261,12 +257,13 @@ class _Content extends StatelessWidget {
                 final s = filtered[index];
                 return VaultTile(
                   snapshot: s,
+                  isHero: s.item.id == hero?.item.id,
                   onTap: () => onOpenItem(s.item),
                 );
               }, childCount: filtered.length),
             ),
           ),
-        if (others.isNotEmpty && filtered.isEmpty)
+        if (snapshots.isNotEmpty && filtered.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
@@ -413,9 +410,7 @@ class _CategoryFilters extends StatelessWidget {
             showCheckmark: false,
             onSelected: (_) => onChanged(isSelected ? null : value),
             side: BorderSide(
-              color: isSelected
-                  ? AppColors.primaryOutline
-                  : AppColors.outline,
+              color: isSelected ? AppColors.primaryOutline : AppColors.outline,
             ),
           );
         },

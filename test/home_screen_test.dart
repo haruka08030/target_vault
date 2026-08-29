@@ -72,10 +72,11 @@ void main() {
 
     expect(find.text('Target Vault'), findsOneWidget);
     expect(find.byType(VaultHeroCard), findsOneWidget);
-    expect(find.text('MacBook'), findsOneWidget);
+    // 主役カードと棚のタイルの両方に出る（ピックアップとして再掲）
+    expect(find.text('MacBook'), findsNWidgets(2));
     expect(find.text('貯金する'), findsOneWidget);
-    // 1件だけならタイルは出ない
-    expect(find.byType(VaultTile), findsNothing);
+    // 主役は棚からも抜かない（ピックアップとして再掲する）
+    expect(find.byType(VaultTile), findsOneWidget);
   });
 
   testWidgets('残高から「あといくら」を出す', (tester) async {
@@ -92,7 +93,7 @@ void main() {
     expect(find.textContaining('7,000'), findsWidgets);
   });
 
-  testWidgets('主役以外はタイルに並ぶ', (tester) async {
+  testWidgets('主役も含めて全ての貯金箱がタイルに並ぶ', (tester) async {
     final backend = ItemTxTestBackend();
     addTearDown(backend.dispose);
     backend.items.addAll([
@@ -112,10 +113,18 @@ void main() {
 
     await _pumpHome(tester, backend);
 
-    // 目標日が近いほうが主役
+    // 目標日が近いほうが主役。ただしタイルからは抜かない。
     expect(find.byType(VaultHeroCard), findsOneWidget);
-    expect(find.byType(VaultTile), findsOneWidget);
-    expect(find.text('ほかの貯金箱'), findsOneWidget);
+    expect(find.byType(VaultTile), findsNWidgets(2));
+    expect(find.text('貯金箱'), findsOneWidget);
+
+    // 主役のタイルは印で見分けられる
+    final heroTiles = tester
+        .widgetList<VaultTile>(find.byType(VaultTile))
+        .where((t) => t.isHero)
+        .toList();
+    expect(heroTiles, hasLength(1));
+    expect(heroTiles.single.snapshot.item.title, '近いほう');
   });
 
   testWidgets('ピン留めが自動選定より優先される', (tester) async {
@@ -163,7 +172,8 @@ void main() {
     ]);
 
     await _pumpHome(tester, backend);
-    expect(find.byType(VaultTile), findsNWidgets(2));
+    // 主役も含めて3件
+    expect(find.byType(VaultTile), findsNWidgets(3));
 
     await tester.tap(find.widgetWithText(FilterChip, '家電'));
     await tester.pumpAndSettle();

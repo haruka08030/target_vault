@@ -11,10 +11,18 @@ import 'item_cover_image.dart';
 ///
 /// 棚に並んだ瓶のイメージ。タップでアイテム詳細へ。
 class VaultTile extends StatelessWidget {
-  const VaultTile({super.key, required this.snapshot, required this.onTap});
+  const VaultTile({
+    super.key,
+    required this.snapshot,
+    required this.onTap,
+    this.isHero = false,
+  });
 
   final VaultSnapshot snapshot;
   final VoidCallback onTap;
+
+  /// いま主役カードに出ている貯金箱か。棚の中での対応をわかるようにする。
+  final bool isHero;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +57,12 @@ class VaultTile extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.outlineVariant),
+                border: Border.all(
+                  color: isHero
+                      ? AppColors.primaryOutline
+                      : AppColors.outlineVariant,
+                  width: isHero ? 2 : 1,
+                ),
               ),
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -61,16 +74,30 @@ class VaultTile extends StatelessWidget {
                     child: _Thumb(imageRef: hasPhoto ? item.imagePath : null),
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontFamily: 'Manrope',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      if (item.isPinned) ...[
+                        const Icon(
+                          Icons.push_pin,
+                          size: 14,
+                          color: AppColors.primaryOutline,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Flexible(
+                        child: Text(
+                          item.title,
+                          style: const TextStyle(
+                            fontFamily: 'Manrope',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
