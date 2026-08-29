@@ -44,4 +44,19 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# 秘密情報
 .env
+
+# 設計メモ・スクショ・依存物（公開しない）
+docs/
+
+# エディタ個人設定（MCP の認証トークンを含む）
+.cursor/
+**/xcuserdata/
+
+# CocoaPods（依存物。pubspec/Podfile から復元できる）
+ios/Pods/
+macos/Pods/
+
+# 作業中に出たスクリーンショット
+flutter_*.png
