@@ -50,12 +50,6 @@ lib/
 └── l10n/         # 日本語 / 英語
 ```
 
-## 設計の前提
-
-**機能を足す前に [docs/要件定義書.md](docs/要件定義書.md) の
-「やらないこと」を読んでください。** そこにあるものは意図的に外しています。
-判断の経緯は [docs/design_decisions.md](docs/design_decisions.md) にあります。
-
 ## テスト
 
 ```bash
